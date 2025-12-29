@@ -53,19 +53,16 @@ class _ServiceEditorDialogState extends State<ServiceEditorDialog> {
     if (widget.service != null) {
       String description = widget.service!.description;
       
-      // Emlékeztető előtag eltávolítása
       if (description.startsWith(REMINDER_PREFIX)) {
         description = description.replaceFirst(REMINDER_PREFIX, '');
       }
       
-      // 1. Megjegyzés leválasztása
       if (description.contains(' - ')) {
         final parts = description.split(' - ');
         description = parts[0];
         if (parts.length > 1) initialNote = parts[1];
       }
 
-      // 2. Típus és zárójel tartalom szétválasztása
       if (description.contains('(')) {
         final typeParts = description.split(' (');
         initialServiceType = typeParts[0];
@@ -98,6 +95,9 @@ class _ServiceEditorDialogState extends State<ServiceEditorDialog> {
       } else {
         initialServiceType = description;
       }
+    }
+
+    if (initialServiceType != null && !SERVICE_DEFINITIONS.containsKey(initialServiceType) && initialServiceType != 'Pályamatrica') {
     }
 
     _selectedServiceType = initialServiceType;
@@ -188,8 +188,7 @@ class _ServiceEditorDialogState extends State<ServiceEditorDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dateFormat = DateFormat('yyyy. MM. dd.');
-    // JAVÍTVA: Csak a SERVICE_DEFINITIONS kulcsait használjuk, mert a Pályamatrica már benne van!
-    final serviceTypes = SERVICE_DEFINITIONS.keys.toList(); 
+    final serviceTypes = SERVICE_DEFINITIONS.keys.toList();
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -304,6 +303,7 @@ class _ServiceEditorDialogState extends State<ServiceEditorDialog> {
                           children: [
                             Expanded(child: _buildModernField(controller: _oilTypeController, label: 'Típus (pl. 5W-30)', icon: Icons.opacity, isRequired: false)),
                             const SizedBox(width: 16),
+                            // ITT A VÁLTOZÁS: isDecimal esetén is engedjük a kötőjelet, ha Liter a címke
                             Expanded(child: _buildModernField(controller: _oilAmountController, label: 'Liter', icon: Icons.water_drop, isDecimal: true, isRequired: false)),
                           ],
                         ),
@@ -407,14 +407,23 @@ class _ServiceEditorDialogState extends State<ServiceEditorDialog> {
     bool isDecimal = false,
     bool isRequired = true,
   }) {
+    // Regex módosítása: Ha a címke tartalmazza a 'Liter' szót, engedjük a kötőjelet is.
+    final bool allowRange = label.contains('Liter');
+    final String regexString = allowRange ? r'[0-9.,-]' : (isDecimal ? r'[0-9.,]' : r'[0-9]');
+
     return TextFormField(
       controller: controller,
       decoration: _buildInputDecoration(label: label, icon: icon, isRequired: isRequired, suffix: suffix),
-      keyboardType: TextInputType.numberWithOptions(decimal: isDecimal),
-      inputFormatters: isDecimal || label.contains('Km') || label.contains('Költség') 
-          ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))] 
+      // Ha kötőjelet is engedünk, akkor a billentyűzet inkább szöveges legyen, hogy könnyen elérhető legyen a jel
+      keyboardType: allowRange ? TextInputType.text : (isNumber ? TextInputType.numberWithOptions(decimal: isDecimal) : TextInputType.text),
+      // JAVÍTVA: A szűrés most már engedi a kötőjelet, ha kell
+      inputFormatters: isDecimal || label.contains('Km') || label.contains('Költség') || allowRange
+          ? [FilteringTextInputFormatter.allow(RegExp(regexString))] 
           : [],
       validator: (value) => (isRequired && (value?.isEmpty ?? true)) ? 'Kötelező' : null,
     );
   }
+  
+  // Segédváltozó a keyboardType logikához, mivel a paraméterek között csak isDecimal van
+  bool get isNumber => true; // Feltételezzük, hogy ez a metódus számokhoz van, kivéve ha allowRange felülírja
 }
