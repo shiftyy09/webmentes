@@ -25,12 +25,13 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
   late final TextEditingController _mileageController;
   late final TextEditingController _vinController;
   
-  String? _selectedMake;
+  // A gyártmányhoz most már egy TextController kell az Autocomplete miatt
+  late final TextEditingController _makeController;
+  
   String? _selectedVezerlesTipus;
 
   final Map<String, TextEditingController> _serviceDateControllers = {};
   final Map<String, TextEditingController> _serviceMileageControllers = {};
-  // Külön tároló a matrica típusnak
   String? _selectedVignetteType; 
   final List<String> _vignetteTypes = ['Heti (10 napos)', 'Havi', 'Éves (Országos)', 'Éves (Megyei)'];
 
@@ -40,10 +41,17 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
   void initState() {
     super.initState();
     _licensePlateController = TextEditingController(text: widget.vehicle?.licensePlate ?? '');
-    _selectedMake = widget.vehicle?.make;
-    if (_selectedMake != null && !SUPPORTED_CAR_MAKES.contains(_selectedMake)) {
-       _selectedMake = null; 
+    
+    // Gyártmány inicializálása
+    String initialMake = widget.vehicle?.make ?? '';
+    // Ha nem üres és nincs a listában, töröljük (hogy újat válasszon), kivéve ha szerkesztés
+    if (initialMake.isNotEmpty && !SUPPORTED_CAR_MAKES.contains(initialMake)) {
+       // Itt dönthetünk: engedjük a régit, vagy kényszerítjük az újat.
+       // A kérés szerint "csak azokat lehessen", így ha érvénytelen, üresen hagyjuk.
+       if (!_isEditing) initialMake = ''; 
     }
+    _makeController = TextEditingController(text: initialMake);
+
     _modelController = TextEditingController(text: widget.vehicle?.model ?? '');
     _yearController = TextEditingController(text: widget.vehicle?.year.toString() ?? '');
     _mileageController = TextEditingController(text: widget.vehicle?.mileage.toString() ?? '');
@@ -59,6 +67,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
   @override
   void dispose() {
     _licensePlateController.dispose();
+    _makeController.dispose(); // Ezt is dobjuk
     _modelController.dispose();
     _yearController.dispose();
     _mileageController.dispose();
@@ -73,7 +82,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
       final vehicle = Jarmu(
         id: widget.vehicle?.id,
         licensePlate: _licensePlateController.text.toUpperCase(),
-        make: _selectedMake!,
+        make: _makeController.text, // A controllerből vesszük az értéket
         model: _modelController.text,
         year: int.tryParse(_yearController.text) ?? 0,
         mileage: int.tryParse(_mileageController.text) ?? 0,
@@ -87,7 +96,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
           final mileageController = _serviceMileageControllers[serviceType]!;
           
           String description = '$REMINDER_PREFIX$serviceType';
-          // Ha matrica és van kiválasztva típus, hozzáfűzzük
           if (serviceType == 'Pályamatrica' && _selectedVignetteType != null) {
             description += ' ($_selectedVignetteType)';
           }
@@ -136,7 +144,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // FEJLÉC
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
               decoration: BoxDecoration(
@@ -165,7 +172,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
               ),
             ),
 
-            // TARTALOM
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -173,7 +179,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // ALAPADATOK
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -191,13 +196,40 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                 Expanded(child: _buildModernField(controller: _licensePlateController, label: 'Rendszám', icon: Icons.badge, isRequired: true)),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    value: _selectedMake,
-                                    items: SUPPORTED_CAR_MAKES.map((make) => DropdownMenuItem(value: make, child: Text(make))).toList(),
-                                    onChanged: (value) => setState(() => _selectedMake = value),
-                                    decoration: _buildInputDecoration(label: 'Gyártmány', icon: Icons.factory),
-                                    validator: (value) => (value == null) ? 'Kötelező' : null,
-                                    menuMaxHeight: 300,
+                                  // KERESHETŐ GYÁRTMÁNY VÁLASZTÓ (AUTOCOMPLETE)
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) => Autocomplete<String>(
+                                      initialValue: TextEditingValue(text: _makeController.text),
+                                      optionsBuilder: (TextEditingValue textEditingValue) {
+                                        if (textEditingValue.text == '') return const Iterable<String>.empty();
+                                        return SUPPORTED_CAR_MAKES.where((String option) {
+                                          return option.toLowerCase().startsWith(textEditingValue.text.toLowerCase());
+                                        });
+                                      },
+                                      onSelected: (String selection) {
+                                        _makeController.text = selection;
+                                      },
+                                      fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                                        // Szinkronizáció
+                                        if (_makeController.text.isNotEmpty && textEditingController.text.isEmpty) {
+                                            textEditingController.text = _makeController.text;
+                                        }
+                                        return TextFormField(
+                                          controller: textEditingController,
+                                          focusNode: focusNode,
+                                          onFieldSubmitted: (String value) {
+                                            onFieldSubmitted();
+                                          },
+                                          onChanged: (val) => _makeController.text = val,
+                                          decoration: _buildInputDecoration(label: 'Gyártmány', icon: Icons.factory),
+                                          validator: (value) {
+                                            if (value == null || value.isEmpty) return 'Kötelező';
+                                            if (!SUPPORTED_CAR_MAKES.contains(value)) return 'Válassz a listából!';
+                                            return null;
+                                          },
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                               ],
@@ -231,7 +263,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                       
                       const SizedBox(height: 24),
 
-                      // KEZDETI SZERVIZADATOK
                       Theme(
                         data: theme.copyWith(dividerColor: Colors.transparent),
                         child: Container(
@@ -283,15 +314,14 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                         ),
                                       ],
                                     ),
-                                    // Pályamatrica esetén extra dropdown
                                     if (isVignette)
                                       Padding(
-                                        padding: const EdgeInsets.only(top: 8.0, left: 120), // Kis behúzás
+                                        padding: const EdgeInsets.only(top: 8.0, left: 120),
                                         child: DropdownButtonFormField<String>(
                                           value: _selectedVignetteType,
                                           items: _vignetteTypes.map((type) => DropdownMenuItem(value: type, child: Text(type, style: const TextStyle(fontSize: 13)))).toList(),
                                           onChanged: (value) => setState(() => _selectedVignetteType = value),
-                                          decoration: _buildInputDecoration(label: 'Matrica típusa', icon: Icons.confirmation_number, isSmall: true),
+                                          decoration: _buildInputDecoration(label: 'Matrica típusa', icon: Icons.timer, isSmall: true),
                                           style: const TextStyle(fontSize: 13, color: Colors.black),
                                         ),
                                       ),
@@ -345,14 +375,14 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
 
   InputDecoration _buildInputDecoration({required String label, required IconData icon, bool isSmall = false}) {
     return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: Colors.grey, size: isSmall ? 18 : 24),
-      filled: true,
-      fillColor: Colors.grey.withOpacity(0.05),
-      contentPadding: isSmall ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8) : null,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withOpacity(0.3))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withOpacity(0.3))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.orange, width: 2)),
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.grey, size: isSmall ? 18 : 24),
+        filled: true,
+        fillColor: Colors.grey.withOpacity(0.05),
+        contentPadding: isSmall ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8) : null,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withOpacity(0.3))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withOpacity(0.3))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.orange, width: 2)),
     );
   }
 

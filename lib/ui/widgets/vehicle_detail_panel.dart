@@ -2,10 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:olajfolt_web/modellek/jarmu.dart';
+import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
+import 'package:olajfolt_web/services/firestore_service.dart';
+import 'package:olajfolt_web/services/pdf_service.dart';
 import 'package:olajfolt_web/ui/widgets/service_list_view.dart';
 import 'package:olajfolt_web/ui/widgets/vehicle_data_view.dart';
 import 'package:olajfolt_web/ui/widgets/vehicle_stats_view.dart';
+import 'package:olajfolt_web/ui/widgets/maintenance_reminder_view.dart';
 
 class VehicleDetailPanel extends ConsumerStatefulWidget {
   final Function(Jarmu) onEditVehicle;
@@ -23,7 +27,7 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -55,6 +59,17 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
         ref.read(selectedVehicleIdProvider.notifier).state = null;
         await firestoreService.deleteVehicle(user.uid, vehicle.id!);
       }
+    }
+  }
+
+  Future<void> _exportPdf(Jarmu vehicle) async {
+    final firestoreService = ref.read(firestoreServiceProvider);
+    final user = ref.read(authStateProvider).value;
+    
+    if (user != null && vehicle.id != null) {
+      final services = await firestoreService.watchServices(user.uid, vehicle.id!).first;
+      final pdfService = PdfService();
+      await pdfService.generateAndDownloadPdf(vehicle, services);
     }
   }
 
@@ -138,8 +153,7 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
                 ),
                 child: TabBar(
                   controller: _tabController,
-                  // Ez a sor hiányzott! Ez mondja meg, hogy töltse ki a teljes fület.
-                  indicatorSize: TabBarIndicatorSize.tab, 
+                  indicatorSize: TabBarIndicatorSize.tab,
                   indicator: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                     color: theme.colorScheme.primary,
@@ -147,6 +161,7 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
                   labelColor: theme.brightness == Brightness.light ? Colors.white : Colors.black,
                   unselectedLabelColor: theme.textTheme.bodyMedium?.color,
                   tabs: const [
+                    Tab(text: 'KARBANTARTÁS'),
                     Tab(text: 'SZERVIZ'),
                     Tab(text: 'ADATOK'),
                     Tab(text: 'STATISZTIKA'),
@@ -159,8 +174,12 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  const ServiceListView(),
-                  VehicleDataView(vehicle: vehicle),
+                  MaintenanceReminderView(vehicle: vehicle),
+                  const ServiceListView(), // Már nem kell vehicle, mert nem itt van a PDF
+                  VehicleDataView(
+                    vehicle: vehicle, 
+                    onExportPdf: () => _exportPdf(vehicle), // Itt adjuk át a callback-et
+                  ),
                   const VehicleStatsView(),
                 ],
               ),

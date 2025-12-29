@@ -6,8 +6,8 @@ class Jarmu {
   final String model;
   final int year;
   final int mileage;
-  final String? vin; // Hozzáadva
-  final String? vezerlesTipusa; // Hozzáadva
+  final String? vin;
+  final String? vezerlesTipusa;
 
   Jarmu({
     this.id,
@@ -19,6 +19,29 @@ class Jarmu {
     this.vin,
     this.vezerlesTipusa,
   });
+
+  // Másolat készítése módosított adatokkal (immutable pattern)
+  Jarmu copyWith({
+    String? id,
+    String? licensePlate,
+    String? make,
+    String? model,
+    int? year,
+    int? mileage,
+    String? vin,
+    String? vezerlesTipusa,
+  }) {
+    return Jarmu(
+      id: id ?? this.id,
+      licensePlate: licensePlate ?? this.licensePlate,
+      make: make ?? this.make,
+      model: model ?? this.model,
+      year: year ?? this.year,
+      mileage: mileage ?? this.mileage,
+      vin: vin ?? this.vin,
+      vezerlesTipusa: vezerlesTipusa ?? this.vezerlesTipusa,
+    );
+  }
 
   factory Jarmu.empty() {
     return Jarmu(

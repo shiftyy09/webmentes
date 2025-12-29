@@ -1,6 +1,7 @@
 // lib/ui/widgets/service_list_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/ui/dialogs/service_editor_dialog.dart';
@@ -8,7 +9,9 @@ import 'package:olajfolt_web/ui/dialogs/fueling_dialog.dart';
 import 'package:olajfolt_web/ui/widgets/service_list_item.dart';
 
 class ServiceListView extends ConsumerWidget {
-  const ServiceListView({super.key});
+  final Jarmu? vehicle;
+
+  const ServiceListView({super.key, this.vehicle});
 
   Future<void> _openEditor(BuildContext context, WidgetRef ref, {Szerviz? service}) async {
     final firestoreService = ref.read(firestoreServiceProvider);
@@ -86,18 +89,16 @@ class ServiceListView extends ConsumerWidget {
 
     return Column(
       children: [
-        // GOMBOK SÁVJA - MÉG EGYÉRTELMŰBB VERZIÓ
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Row(
             children: [
-              // 1. TANKOLÁS GOMB (+ jellel)
               Expanded(
                 child: SizedBox(
                   height: 50,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.local_gas_station, size: 24),
-                    label: const Text('+ TANKOLÁS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    label: const Text('Tankolás hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     onPressed: () {
                       final services = servicesAsync.value ?? [];
                       _openFuelingDialog(context, ref, services);
@@ -112,13 +113,12 @@ class ServiceListView extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              // 2. EGYÉB SZERVIZ GOMB (Plusz ikonnal és jellel)
               Expanded(
                 child: SizedBox(
                   height: 50,
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add, size: 28), // Kifejezetten a + ikon
-                    label: const Text('+ EGYÉB SZERVIZ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    icon: const Icon(Icons.add, size: 28),
+                    label: const Text('Szerviz hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     onPressed: () => _openEditor(context, ref),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isDark ? Colors.grey[800] : Colors.white,
@@ -132,15 +132,21 @@ class ServiceListView extends ConsumerWidget {
             ],
           ),
         ),
-        // LISTA
+        
         Expanded(
           child: servicesAsync.when(
             data: (services) {
               if (services.isEmpty) {
                 return const Center(child: Text('Ehhez a járműhöz még nincsenek szervizbejegyzések.'));
               }
-              return ListView.builder(
+              return GridView.builder(
                 padding: const EdgeInsets.all(16.0),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 300, 
+                  childAspectRatio: 1.4,   
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
                 itemCount: services.length,
                 itemBuilder: (context, index) {
                   final service = services[index];

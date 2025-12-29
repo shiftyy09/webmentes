@@ -4,9 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
-import 'package:olajfolt_web/ui/calculators/transfer_cost_page.dart';
 import 'package:olajfolt_web/ui/dialogs/vehicle_editor_dialog.dart';
-import 'package:olajfolt_web/ui/notification_settings_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -43,18 +41,6 @@ class HomePage extends ConsumerWidget {
     }
   }
 
-  void _openNotificationSettings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const NotificationSettingsPage()),
-    );
-  }
-
-  void _openCalculator(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const TransferCostCalculatorPage()),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authStateProvider).value;
@@ -63,30 +49,9 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        foregroundColor: Colors.white,
-        centerTitle: true,
-        title: SizedBox(
-          height: 40,
-          child: Image.asset('assets/olajfoltweb.png', fit: BoxFit.contain),
-        ),
+        title: const Text('Járműveim'),
+        // A vissza gombot a Flutter automatikusan kezeli, ha push-olva lett az oldal
         actions: [
-          // KALKULÁTOR GOMB (Szöveggel)
-          TextButton.icon(
-            onPressed: () => _openCalculator(context),
-            icon: const Icon(Icons.calculate_outlined, color: Colors.white),
-            label: const Text('Kalkulátor', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 8),
-          
-          // ÉRTESÍTÉSEK GOMB (Szöveggel)
-          TextButton.icon(
-            onPressed: () => _openNotificationSettings(context),
-            icon: const Icon(Icons.notifications_active_outlined, color: Colors.white),
-            label: const Text('Értesítések', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 16), // Kis elválasztó
-
           IconButton(
             icon: Icon(themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
             onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
@@ -100,7 +65,7 @@ class HomePage extends ConsumerWidget {
             ),
           TextButton(
             onPressed: () async => await authService.signOut(),
-            child: const Text('Kijelentkezés', style: TextStyle(color: Colors.white)),
+            child: const Text('Kijelentkezés'),
           ),
           const SizedBox(width: 8),
         ],
@@ -126,17 +91,17 @@ class HomePage extends ConsumerWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-            color: const Color(0xFF1E1E1E),
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.grey[200],
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Verzió: 1.0.0',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 Row(
                   children: [
-                    const Text('Elérhetőség: shiftyy09@gmail.com', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    const Text('Elérhetőség: info@olajfolt.hu', style: TextStyle(fontSize: 12, color: Colors.grey)),
                     const SizedBox(width: 24),
                     InkWell(
                       onTap: () async {
@@ -147,7 +112,7 @@ class HomePage extends ConsumerWidget {
                       },
                       child: const Text(
                         'Mobilalkalmazás letöltése: olajfolt.hu/app',
-                        style: TextStyle(color: Color(0xFFFFA400), fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Color(0xFFE69500), fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],

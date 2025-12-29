@@ -18,7 +18,11 @@ dependencies:
   firebase_app_check: ^0.3.0
   flutter_slidable: ^3.1.0
   url_launcher: ^6.2.0
-  package_info_plus: ^8.0.0 # Frissítve a kompatibilitás miatt
+  package_info_plus: ^8.0.0
+  
+  # PDF Generáláshoz
+  pdf: ^3.10.0
+  printing: ^5.11.0
 
 dev_dependencies:
   flutter_test:

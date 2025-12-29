@@ -10,7 +10,7 @@ import 'firebase_options.dart';
 import 'providers.dart';
 import 'theme_provider.dart';
 import 'ui/login_page.dart';
-import 'ui/home_page.dart';
+import 'ui/dashboard_page.dart'; // Új import
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +40,7 @@ class OlajfoltWebApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
-    const brandColor = Color(0xFFE69500); // Új, sötétebb narancs
+    const brandColor = Color(0xFFE69500); 
 
     final darkTheme = ThemeData(
       colorScheme: ColorScheme.fromSeed(
@@ -89,7 +89,7 @@ class RootPage extends ConsumerWidget {
         if (user == null) {
           return const LoginPage();
         }
-        return const HomePage();
+        return const DashboardPage(); // Módosítva a Dashboardra
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
