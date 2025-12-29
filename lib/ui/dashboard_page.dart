@@ -97,7 +97,7 @@ class DashboardPage extends ConsumerWidget {
 
                   const SizedBox(height: 60),
 
-                  // ANDROID PROMÓ BANNER - FŐ ÜZENETTEL
+                  // ANDROID PROMÓ BANNER - TISZTÁBB VERZIÓ
                   _buildAndroidBanner(context),
                 ],
               ),
@@ -120,7 +120,7 @@ class DashboardPage extends ConsumerWidget {
                         final url = Uri.parse('https://nj-creative.hu');
                         if (await canLaunchUrl(url)) await launchUrl(url);
                       },
-                      child: const Text('NJ-CREATIVE', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                      child: const Text('NJ-CREATIVE (NJ-creative.hu)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
                     ),
                   ],
                 ),
@@ -155,23 +155,24 @@ class DashboardPage extends ConsumerWidget {
       ),
       child: Row(
         children: [
+          // Android Ikon visszakerült
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.sync, size: 32, color: Colors.white), // Szinkronizáció ikon
+            child: const Icon(Icons.android, size: 32, color: Colors.white),
           ),
           const SizedBox(width: 20),
           
-          // Szöveg
+          // Szöveg - Tárgyilagosabb
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Teljes Szinkronizáció: App & Web',
+                  'Teljes szinkronizáció web és app között',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -180,7 +181,7 @@ class DashboardPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Amit itt módosítasz, azonnal megjelenik a mobilodon is! Ilyen komplex, valós idejű szinkronizáció egyedülálló a piacon.',
+                  'Az adatok automatikusan frissülnek mindkét felületen.',
                   style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
                 ),
               ],
