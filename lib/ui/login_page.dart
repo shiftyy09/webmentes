@@ -1,7 +1,8 @@
 // lib/ui/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // HIÁNYZÓ IMPORT
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -53,94 +54,234 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _launchURL(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri)) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hiba a link megnyitásakor')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authService = ref.watch(authServiceProvider);
     final theme = Theme.of(context);
+    final isLargeScreen = MediaQuery.of(context).size.width > 800;
 
     return Scaffold(
-      body: Stack(
-        alignment: Alignment.center,
+      body: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.grey[900]!, const Color(0xFF101016)],
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 500,
-            height: 500,
-            child: Opacity(
-              opacity: 0.05,
-              child: Image.asset('assets/olajfoltweb.png', fit: BoxFit.contain),
-            ),
-          ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Card(
-              elevation: 8,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: const Color(0xFF1E1E1E).withOpacity(0.9),
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_isLogin ? 'Bejelentkezés' : 'Regisztráció', style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white)),
-                    const SizedBox(height: 24),
-                    
-                    TextField(
-                      controller: _emailController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(labelText: 'E-mail cím', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email)),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _passwordController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(labelText: 'Jelszó', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock)),
-                      obscureText: true,
-                    ),
-                    
-                    if (_errorText != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16.0),
-                        child: Text(_errorText!, style: const TextStyle(color: Colors.redAccent)),
-                      ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _submit,
-                        child: _isLoading ? const CircularProgressIndicator() : Text(_isLogin ? 'BEJELENTKEZÉS' : 'REGISZTRÁCIÓ'),
-                      ),
-                    ),
-                    
-                    TextButton(
-                      onPressed: () => setState(() => _isLogin = !_isLogin),
-                      child: Text(_isLogin ? 'Nincs fiókod? Regisztrálj!' : 'Van már fiókod? Jelentkezz be!'),
-                    ),
+          // BAL OLDAL - BEJELENTKEZÉS
+          Expanded(
+            flex: 2,
+            child: Container(
+              color: const Color(0xFF101016),
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Mobilon a logó itt jelenik meg
+                        if (!isLargeScreen) ...[
+                          Center(
+                            child: Image.asset('assets/olajfoltweb.png', width: 120, height: 120),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+                        
+                        Text(
+                          _isLogin ? 'Üdvözöljük újra!' : 'Fiók létrehozása',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isLogin ? 'Jelentkezz be a folytatáshoz.' : 'Regisztrálj az adatok szinkronizálásához.',
+                          style: TextStyle(color: Colors.grey[400]),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
 
-                    const Divider(height: 24, color: Colors.white24),
-                    
-                    FilledButton.icon(
-                      icon: const Icon(Icons.login),
-                      label: const Text('Bejelentkezés Google fiókkal'),
-                      onPressed: () async => await authService.signInWithGoogleWeb(),
+                        TextField(
+                          controller: _emailController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'E-mail cím',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            prefixIcon: const Icon(Icons.email),
+                            filled: true,
+                            fillColor: Colors.grey[900],
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _passwordController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Jelszó',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            prefixIcon: const Icon(Icons.lock),
+                            filled: true,
+                            fillColor: Colors.grey[900],
+                          ),
+                          obscureText: true,
+                        ),
+
+                        if (_errorText != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0),
+                            child: Text(_errorText!, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                          ),
+
+                        const SizedBox(height: 24),
+
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: _isLoading 
+                                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                                : Text(_isLogin ? 'BEJELENTKEZÉS' : 'REGISZTRÁCIÓ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        
+                        TextButton(
+                          onPressed: () => setState(() => _isLogin = !_isLogin),
+                          child: Text(_isLogin ? 'Nincs még fiókod? Regisztrálj!' : 'Van már fiókod? Jelentkezz be!'),
+                        ),
+
+                        const SizedBox(height: 24),
+                        const Row(children: [Expanded(child: Divider(color: Colors.white24)), Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('VAGY', style: TextStyle(color: Colors.white54))), Expanded(child: Divider(color: Colors.white24))]),
+                        const SizedBox(height: 24),
+
+                        SizedBox(
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.login),
+                            label: const Text('Folytatás Google fiókkal'),
+                            onPressed: () async => await authService.signInWithGoogleWeb(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white24),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
+
+          // JOBB OLDAL - INFORMÁCIÓS PANEL (Csak nagy képernyőn)
+          if (isLargeScreen)
+            Expanded(
+              flex: 3,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [Colors.orange.shade900, const Color(0xFF2C2C2C)],
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(60.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // LOGÓ
+                      Image.asset('assets/olajfoltweb.png', width: 250, fit: BoxFit.contain),
+                      const SizedBox(height: 40),
+                      
+                      const Text(
+                        'A jövő szerviznaplója.',
+                        style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Kezeld járműveidet profin, szinkronizáld adataidat valós időben a mobiloddal, és soha ne maradj le egyetlen karbantartásról sem.',
+                        style: TextStyle(color: Colors.white70, fontSize: 18, height: 1.5),
+                      ),
+                      
+                      const SizedBox(height: 60),
+
+                      // MOBILAPP PROMÓ
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.android, size: 48, color: Colors.greenAccent),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Olajfolt Mobilalkalmazás', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  Text('Töltsd le Androidra és vidd magaddal az adataidat!', style: TextStyle(color: Colors.white.withOpacity(0.7))),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            ElevatedButton(
+                              onPressed: () => _launchURL('https://olajfolt.hu/app'),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+                              child: const Text('LETÖLTÉS'),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // LÁBLÉC
+                      const Divider(color: Colors.white24),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              InkWell(
+                                onTap: () => _launchURL('https://nj-creative.hu'),
+                                child: const Text('Fejlesztette: NJ-CREATIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text('info@olajfolt.hu', style: TextStyle(color: Colors.white54)),
+                            ],
+                          ),
+                          const Text('v1.0', style: TextStyle(color: Colors.white54)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

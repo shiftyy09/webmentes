@@ -7,128 +7,260 @@ import 'package:olajfolt_web/ui/home_page.dart';
 import 'package:olajfolt_web/ui/calculators/transfer_cost_page.dart';
 import 'package:olajfolt_web/ui/notification_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 
-class DashboardPage extends ConsumerWidget {
+class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProviderStateMixin {
+  bool _showIntro = true;
+  late AnimationController _iconController;
+  late AnimationController _fadeController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  Timer? _safetyTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _iconController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _scaleAnimation = CurvedAnimation(parent: _iconController, curve: Curves.elasticOut);
+    
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(_fadeController);
+
+    // Biztosítjuk, hogy a build után induljon az animáció
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startAnimationSequence();
+    });
+
+    // BIZTONSÁGI IDŐZÍTŐ: Ha bármi miatt nem futna le az animáció, 3 mp után mindenképp eltűnik az intro
+    _safetyTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _showIntro) {
+        setState(() => _showIntro = false);
+      }
+    });
+  }
+
+  Future<void> _startAnimationSequence() async {
+    try {
+      await _iconController.forward().orCancel;
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _fadeController.forward().orCancel;
+    } catch (e) {
+      // Animáció megszakítva vagy hiba
+    } finally {
+      if (mounted) {
+        setState(() {
+          _showIntro = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _iconController.dispose();
+    _fadeController.dispose();
+    _safetyTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(authStateProvider).value;
     final authService = ref.watch(authServiceProvider);
     final themeMode = ref.watch(themeProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        foregroundColor: Colors.white,
-        centerTitle: true,
-        title: SizedBox(
-          height: 40,
-          child: Image.asset('assets/olajfoltweb.png', fit: BoxFit.contain),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
-          ),
-          const SizedBox(width: 8),
-          if (auth != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Center(child: Text(auth.email ?? '', style: const TextStyle(fontSize: 14))),
-            ),
-          TextButton(
-            onPressed: () async => await authService.signOut(),
-            child: const Text('Kijelentkezés', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(40),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Üdvözöljük az Olajfolt Web felületén!',
-                    style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
+          // --- FŐ TARTALOM (Ami az animáció mögött van) ---
+          Scaffold(
+            appBar: AppBar(
+              backgroundColor: const Color(0xFF1E1E1E),
+              foregroundColor: Colors.white,
+              centerTitle: true,
+              title: SizedBox(
+                height: 40,
+                child: Image.asset('assets/olajfoltweb.png', fit: BoxFit.contain),
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
+                  onPressed: () => ref.read(themeProvider.notifier).toggleTheme(),
+                ),
+                const SizedBox(width: 8),
+                if (auth != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Center(child: Text(auth.email ?? '', style: const TextStyle(fontSize: 14))),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Válasszon az alábbi modulok közül:',
-                    style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
+                TextButton(
+                  onPressed: () async => await authService.signOut(),
+                  child: const Text('Kijelentkezés', style: TextStyle(color: Colors.white)),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            body: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Üdvözöljük az Olajfolt Web felületén!',
+                          style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Válasszon az alábbi modulok közül:',
+                          style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 50),
+                        
+                        Wrap(
+                          spacing: 40,
+                          runSpacing: 40,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            _MenuCard(
+                              title: 'JÁRMŰVEK',
+                              subtitle: 'Szerviznapló és karbantartás',
+                              icon: Icons.directions_car,
+                              color: Colors.orange,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomePage())),
+                            ),
+                            _MenuCard(
+                              title: 'KALKULÁTOR',
+                              subtitle: 'Átírási költségek számítása',
+                              icon: Icons.calculate,
+                              color: Colors.blue,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferCostCalculatorPage())),
+                            ),
+                            _MenuCard(
+                              title: 'ÉRTESÍTÉSEK',
+                              subtitle: 'E-mail emlékeztetők beállítása',
+                              icon: Icons.notifications_active,
+                              color: Colors.green,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 60),
+                        _buildAndroidBanner(context),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 50),
-                  
-                  // MENÜ KÁRTYÁK
-                  Wrap(
-                    spacing: 40,
-                    runSpacing: 40,
-                    alignment: WrapAlignment.center,
+                ),
+                
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  color: const Color(0xFF1E1E1E),
+                  child: Column(
                     children: [
-                      _MenuCard(
-                        title: 'JÁRMŰVEK',
-                        subtitle: 'Szerviznapló és karbantartás',
-                        icon: Icons.directions_car,
-                        color: Colors.orange,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomePage())),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('Készítette: ', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                          InkWell(
+                            onTap: () async {
+                              final url = Uri.parse('https://nj-creative.hu');
+                              if (await canLaunchUrl(url)) await launchUrl(url);
+                            },
+                            child: const Text('NJ-CREATIVE (NJ-creative.hu)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ],
                       ),
-                      _MenuCard(
-                        title: 'KALKULÁTOR',
-                        subtitle: 'Átírási költségek számítása',
-                        icon: Icons.calculate,
-                        color: Colors.blue,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferCostCalculatorPage())),
-                      ),
-                      _MenuCard(
-                        title: 'ÉRTESÍTÉSEK',
-                        subtitle: 'E-mail emlékeztetők beállítása',
-                        icon: Icons.notifications_active,
-                        color: Colors.green,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
-                      ),
+                      const SizedBox(height: 4),
+                      const Text('Elérhetőség: info@olajfolt.hu  |  Verzió: 1.0', style: TextStyle(color: Colors.white54, fontSize: 12)),
                     ],
                   ),
-
-                  const SizedBox(height: 60),
-
-                  // ANDROID PROMÓ BANNER - TISZTÁBB VERZIÓ
-                  _buildAndroidBanner(context),
-                ],
-              ),
-            ),
-          ),
-          
-          // LÁBLÉC (FOOTER)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: const Color(0xFF1E1E1E),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Készítette: ', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                    InkWell(
-                      onTap: () async {
-                        final url = Uri.parse('https://nj-creative.hu');
-                        if (await canLaunchUrl(url)) await launchUrl(url);
-                      },
-                      child: const Text('NJ-CREATIVE (NJ-creative.hu)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                  ],
                 ),
-                const SizedBox(height: 4),
-                const Text('Elérhetőség: info@olajfolt.hu  |  Verzió: 1.0', style: TextStyle(color: Colors.white54, fontSize: 12)),
               ],
             ),
           ),
+
+          // --- INTRO OVERLAY (A WOW HATÁS) ---
+          if (_showIntro)
+            Positioned.fill(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Container(
+                  color: const Color(0xFF101010), // Sötét háttér
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: Container(
+                            padding: const EdgeInsets.all(30),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.5),
+                                  blurRadius: 50,
+                                  spreadRadius: 10,
+                                )
+                              ],
+                              border: Border.all(color: Colors.green, width: 2),
+                            ),
+                            child: const Icon(Icons.check, size: 80, color: Colors.greenAccent),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        const Text(
+                          'Sikeres bejelentkezés',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Adatok szinkronizálása...',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        const SizedBox(
+                          width: 200,
+                          child: LinearProgressIndicator(
+                            color: Colors.green,
+                            backgroundColor: Colors.white10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -155,7 +287,6 @@ class DashboardPage extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          // Android Ikon visszakerült
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -165,8 +296,6 @@ class DashboardPage extends ConsumerWidget {
             child: const Icon(Icons.android, size: 32, color: Colors.white),
           ),
           const SizedBox(width: 20),
-          
-          // Szöveg - Tárgyilagosabb
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,8 +317,6 @@ class DashboardPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 20),
-
-          // Letöltés Gomb
           ElevatedButton.icon(
             onPressed: () async {
               final url = Uri.parse('https://olajfolt.hu/app');
