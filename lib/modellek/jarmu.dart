@@ -8,6 +8,8 @@ class Jarmu {
   final int mileage;
   final String? vin;
   final String? vezerlesTipusa;
+  // ÚJ: Egyedi intervallumok a webes szinkronhoz
+  final Map<String, int>? customIntervals;
 
   Jarmu({
     this.id,
@@ -18,9 +20,9 @@ class Jarmu {
     required this.mileage,
     this.vin,
     this.vezerlesTipusa,
+    this.customIntervals,
   });
 
-  // Másolat készítése módosított adatokkal (immutable pattern)
   Jarmu copyWith({
     String? id,
     String? licensePlate,
@@ -30,6 +32,7 @@ class Jarmu {
     int? mileage,
     String? vin,
     String? vezerlesTipusa,
+    Map<String, int>? customIntervals,
   }) {
     return Jarmu(
       id: id ?? this.id,
@@ -40,6 +43,7 @@ class Jarmu {
       mileage: mileage ?? this.mileage,
       vin: vin ?? this.vin,
       vezerlesTipusa: vezerlesTipusa ?? this.vezerlesTipusa,
+      customIntervals: customIntervals ?? this.customIntervals,
     );
   }
 
@@ -69,6 +73,9 @@ class Jarmu {
       mileage: (data['mileage'] as num?)?.toInt() ?? 0,
       vin: data['vin'] as String?,
       vezerlesTipusa: data['vezerlesTipusa'] as String?,
+      customIntervals: data['customIntervals'] != null 
+          ? Map<String, int>.from(data['customIntervals']) 
+          : null,
     );
   }
 
@@ -81,6 +88,7 @@ class Jarmu {
       'mileage': mileage,
       'vin': vin,
       'vezerlesTipusa': vezerlesTipusa,
+      if (customIntervals != null) 'customIntervals': customIntervals,
     };
   }
 }

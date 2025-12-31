@@ -15,6 +15,11 @@ class NotificationSettingsPage extends ConsumerStatefulWidget {
 class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsPage> with SingleTickerProviderStateMixin {
   final Map<String, List<String>> _selectedEmails = {}; 
   final Map<String, TextEditingController> _controllers = {};
+  
+  // ÚJ: Kapcsolók állapota
+  final Map<String, bool> _notifyDate = {};
+  final Map<String, bool> _notifyKm = {};
+  
   bool _isLoading = false;
   
   // ANIMÁCIÓHOZ
@@ -29,7 +34,7 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
     _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _scaleAnimation = CurvedAnimation(parent: _animController, curve: Curves.elasticOut);
     _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _animController, curve: Curves.easeIn));
-    _loadSettings();
+    // A betöltést a build-ben lévő stream végzi, de inicializálhatunk alapértelmezéseket
   }
 
   @override
@@ -39,19 +44,26 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    setState(() => _isLoading = true);
-    try {
-      final user = ref.read(authStateProvider).value;
-      if (user == null) return;
+  // Segédfüggvény az adatok betöltéséhez a Firestore snapshotból
+  void _initializeDataForVehicle(String vehicleId, Map<String, dynamic>? data) {
+    if (data == null) return;
+    
+    // E-mailek
+    if (_selectedEmails[vehicleId] == null) {
+      final emails = data['notificationEmails'];
+      if (emails is List) {
+        _selectedEmails[vehicleId] = List<String>.from(emails);
+      } else {
+        _selectedEmails[vehicleId] = [];
+      }
+    }
 
-      final vehiclesAsync = ref.read(vehiclesProvider);
-      // Wait for vehicles to load if needed (simple retry logic or just wait)
-      // Since it's a StreamProvider, we might need to wait for the first value if not ready.
-      // For simplicity here, assuming vehicles are loaded or will load.
-      // Better: In build we handle loading. Here we just setup controllers.
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    // Kapcsolók
+    if (_notifyDate[vehicleId] == null) {
+      _notifyDate[vehicleId] = data['enableEmailDate'] ?? true; // Alapértelmezetten bekapcsolva
+    }
+    if (_notifyKm[vehicleId] == null) {
+      _notifyKm[vehicleId] = data['enableEmailKm'] ?? true;
     }
   }
 
@@ -60,6 +72,8 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
     if (user == null) return;
 
     final emails = _selectedEmails[vehicleId] ?? [];
+    final enableDate = _notifyDate[vehicleId] ?? true;
+    final enableKm = _notifyKm[vehicleId] ?? true;
     
     try {
       await FirebaseFirestore.instance
@@ -68,7 +82,9 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
           .collection('vehicles')
           .doc(vehicleId)
           .set({
-            'notificationEmails': emails
+            'notificationEmails': emails,
+            'enableEmailDate': enableDate,
+            'enableEmailKm': enableKm,
           }, SetOptions(merge: true));
 
       _triggerSuccessAnimation();
@@ -113,6 +129,7 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
   Widget build(BuildContext context) {
     final vehiclesAsync = ref.watch(vehiclesProvider);
     final theme = Theme.of(context);
+    final user = ref.watch(authStateProvider).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -136,86 +153,119 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
                   
                   if (vehicleId == null) return const SizedBox();
 
-                  // Inicializáljuk a listát, ha még nincs (pl. DB-ből kéne jönnie, 
-                  // de most egyszerűsítve a memóriában kezeljük a szerkesztést)
+                  // Kontroller init
                   if (!_controllers.containsKey(vehicleId)) {
                     _controllers[vehicleId] = TextEditingController();
-                    // Itt lehetne betölteni a DB-ből az elmentett e-maileket, ha a modell támogatná
-                    // Mivel most csak a mentés logikát kérted, feltételezzük, hogy üresről indul, vagy már betöltődött.
                   }
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 24),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                  // Adatok betöltése Firestore-ból (StreamBuilderrel, hogy mindig friss legyen)
+                  return StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user!.uid)
+                        .collection('vehicles')
+                        .doc(vehicleId)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data!.exists) {
+                        _initializeDataForVehicle(vehicleId, snapshot.data!.data() as Map<String, dynamic>);
+                      }
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 4,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), shape: BoxShape.circle),
-                                child: const Icon(Icons.directions_car, color: Colors.orange, size: 32),
-                              ),
-                              const SizedBox(width: 16),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              Row(
                                 children: [
-                                  Text(vehicle.licensePlate, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                                  Text('${vehicle.make} ${vehicle.model}', style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey)),
-                                ],
-                              ),
-                              const Spacer(),
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.save),
-                                label: const Text('MENTÉS'),
-                                onPressed: () => _saveSettings(vehicleId),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 32),
-                          const Text('Értesítendő e-mail címek:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: (_selectedEmails[vehicleId] ?? []).map((email) => Chip(
-                              label: Text(email),
-                              deleteIcon: const Icon(Icons.close, size: 18),
-                              onDeleted: () => _removeEmail(vehicleId, email),
-                              backgroundColor: theme.colorScheme.primaryContainer,
-                            )).toList(),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _controllers[vehicleId],
-                                  decoration: InputDecoration(
-                                    labelText: 'Új e-mail hozzáadása',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.add_circle, color: Colors.blue),
-                                      onPressed: () => _addEmail(vehicleId),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), shape: BoxShape.circle),
+                                    child: const Icon(Icons.directions_car, color: Colors.orange, size: 32),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(vehicle.licensePlate, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                                      Text('${vehicle.make} ${vehicle.model}', style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey)),
+                                    ],
+                                  ),
+                                  const Spacer(),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.save),
+                                    label: const Text('MENTÉS'),
+                                    onPressed: () => _saveSettings(vehicleId),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                     ),
                                   ),
-                                  onSubmitted: (_) => _addEmail(vehicleId),
-                                ),
+                                ],
+                              ),
+                              const Divider(height: 32),
+                              
+                              // KAPCSOLÓK VISSZATÉRTÉK
+                              const Text('Értesítési típusok:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              SwitchListTile(
+                                title: const Text('Dátum alapú figyelmeztetések'),
+                                subtitle: const Text('Pl. Műszaki vizsga, éves szerviz, biztosítás lejárata.'),
+                                value: _notifyDate[vehicleId] ?? true,
+                                onChanged: (val) => setState(() => _notifyDate[vehicleId] = val),
+                                secondary: const Icon(Icons.calendar_today, color: Colors.blue),
+                              ),
+                              SwitchListTile(
+                                title: const Text('Km alapú figyelmeztetések'),
+                                subtitle: const Text('Pl. Olajcsere, vezérlés, fékbetétek.'),
+                                value: _notifyKm[vehicleId] ?? true,
+                                onChanged: (val) => setState(() => _notifyKm[vehicleId] = val),
+                                secondary: const Icon(Icons.speed, color: Colors.orange),
+                              ),
+                              
+                              const Divider(height: 24),
+
+                              const Text('Értesítendő e-mail címek:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: (_selectedEmails[vehicleId] ?? []).map((email) => Chip(
+                                  label: Text(email),
+                                  deleteIcon: const Icon(Icons.close, size: 18),
+                                  onDeleted: () => _removeEmail(vehicleId, email),
+                                  backgroundColor: theme.colorScheme.primaryContainer,
+                                )).toList(),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _controllers[vehicleId],
+                                      decoration: InputDecoration(
+                                        labelText: 'Új e-mail hozzáadása',
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(Icons.add_circle, color: Colors.blue),
+                                          onPressed: () => _addEmail(vehicleId),
+                                        ),
+                                      ),
+                                      onSubmitted: (_) => _addEmail(vehicleId),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   );
                 },
               );
@@ -224,7 +274,7 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
             error: (e, st) => Center(child: Text('Hiba: $e')),
           ),
 
-          // --- SIKERES MENTÉS ANIMÁCIÓ (OVERLAY) ---
+          // --- SIKERES MENTÉS ANIMÁCIÓ ---
           if (_showSuccess)
             Positioned.fill(
               child: Center(

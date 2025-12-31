@@ -7,6 +7,7 @@ import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
+import 'package:olajfolt_web/ui/widgets/success_overlay.dart'; // ÚJ IMPORT
 
 class MaintenanceReminderView extends ConsumerStatefulWidget {
   final Jarmu vehicle;
@@ -20,7 +21,6 @@ class MaintenanceReminderView extends ConsumerStatefulWidget {
 class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderView> {
   final TextEditingController _mileageController = TextEditingController();
   bool _isUpdating = false;
-  bool _isSuccess = false;
 
   @override
   void initState() {
@@ -31,7 +31,7 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
   @override
   void didUpdateWidget(covariant MaintenanceReminderView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.vehicle.mileage != widget.vehicle.mileage && !_isUpdating) {
+    if (oldWidget.vehicle.mileage != widget.vehicle.mileage) {
       _mileageController.text = widget.vehicle.mileage.toString();
     }
   }
@@ -61,18 +61,13 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
         await firestoreService.upsertVehicle(user.uid, updatedVehicle);
         
         if (mounted) {
-          setState(() {
-            _isUpdating = false;
-            _isSuccess = true;
-          });
-          
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) setState(() => _isSuccess = false);
-          });
+          // Itt hívjuk meg az új overlay-t a zöld keret helyett
+          SuccessOverlay.show(context: context, message: 'Km óra frissítve!');
         }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hiba: $e'), backgroundColor: Colors.red));
+    } finally {
       if (mounted) setState(() => _isUpdating = false);
     }
   }
@@ -86,8 +81,7 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
     return Column(
       children: [
         Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+          child: Container(
             width: 400,
             padding: const EdgeInsets.all(12),
             margin: const EdgeInsets.all(16),
@@ -96,14 +90,14 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
               borderRadius: BorderRadius.circular(50),
               boxShadow: [
                 BoxShadow(
-                  color: _isSuccess ? Colors.green.withOpacity(0.3) : Colors.black.withOpacity(0.05), 
-                  blurRadius: _isSuccess ? 20 : 10, 
+                  color: Colors.black.withOpacity(0.05), 
+                  blurRadius: 10, 
                   offset: const Offset(0, 4)
                 )
               ],
               border: Border.all(
-                color: _isSuccess ? Colors.green : theme.colorScheme.primary.withOpacity(0.2), 
-                width: _isSuccess ? 2 : 1
+                color: theme.colorScheme.primary.withOpacity(0.2), 
+                width: 1
               ),
             ),
             child: Row(
@@ -112,10 +106,10 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _isSuccess ? Colors.green.withOpacity(0.1) : theme.colorScheme.primary.withOpacity(0.1), 
+                    color: theme.colorScheme.primary.withOpacity(0.1), 
                     shape: BoxShape.circle
                   ),
-                  child: Icon(Icons.speed, size: 24, color: _isSuccess ? Colors.green : theme.colorScheme.primary),
+                  child: Icon(Icons.speed, size: 24, color: theme.colorScheme.primary),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -134,22 +128,16 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
                   ),
                 ),
                 const SizedBox(width: 8),
-                // MODERNIZÁLT MENTÉS GOMB (NINCS FLOPI!)
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _isUpdating
+                IconButton(
+                  onPressed: _isUpdating ? null : _updateMileage,
+                  icon: _isUpdating 
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(
-                          key: ValueKey(_isSuccess),
-                          onPressed: _updateMileage,
-                          // Ha siker, akkor pipa, egyébként FELHŐ ikon (modernebb, mint a save)
-                          icon: Icon(
-                            _isSuccess ? Icons.check_circle : Icons.cloud_upload_outlined, 
-                            size: 32
-                          ),
-                          color: _isSuccess ? Colors.green : theme.colorScheme.primary,
-                          tooltip: 'Frissítés mentése',
+                      : Icon(
+                          Icons.cloud_upload_outlined, // Marad a felhő, mert a siker animáció külön jön
+                          size: 32,
+                          color: theme.colorScheme.primary
                         ),
+                  tooltip: 'Frissítés mentése',
                 ),
               ],
             ),

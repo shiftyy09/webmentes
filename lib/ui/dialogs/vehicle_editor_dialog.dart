@@ -24,14 +24,17 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
   late final TextEditingController _yearController;
   late final TextEditingController _mileageController;
   late final TextEditingController _vinController;
-  
-  // A gyártmányhoz most már egy TextController kell az Autocomplete miatt
   late final TextEditingController _makeController;
   
   String? _selectedVezerlesTipus;
 
   final Map<String, TextEditingController> _serviceDateControllers = {};
   final Map<String, TextEditingController> _serviceMileageControllers = {};
+  
+  // ÚJ: Intervallum szerkesztők
+  final Map<String, TextEditingController> _intervalKmControllers = {};
+  final Map<String, TextEditingController> _intervalMonthControllers = {};
+
   String? _selectedVignetteType; 
   final List<String> _vignetteTypes = ['Heti (10 napos)', 'Havi', 'Éves (Országos)', 'Éves (Megyei)'];
 
@@ -42,12 +45,8 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
     super.initState();
     _licensePlateController = TextEditingController(text: widget.vehicle?.licensePlate ?? '');
     
-    // Gyártmány inicializálása
     String initialMake = widget.vehicle?.make ?? '';
-    // Ha nem üres és nincs a listában, töröljük (hogy újat válasszon), kivéve ha szerkesztés
     if (initialMake.isNotEmpty && !SUPPORTED_CAR_MAKES.contains(initialMake)) {
-       // Itt dönthetünk: engedjük a régit, vagy kényszerítjük az újat.
-       // A kérés szerint "csak azokat lehessen", így ha érvénytelen, üresen hagyjuk.
        if (!_isEditing) initialMake = ''; 
     }
     _makeController = TextEditingController(text: initialMake);
@@ -58,36 +57,72 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
     _vinController = TextEditingController(text: widget.vehicle?.vin ?? '');
     _selectedVezerlesTipus = widget.vehicle?.vezerlesTipusa;
 
+    // Inicializálás
     for (var serviceType in ALL_REMINDER_SERVICE_TYPES) {
       _serviceDateControllers[serviceType] = TextEditingController();
       _serviceMileageControllers[serviceType] = TextEditingController();
+      
+      // Intervallumok betöltése (ha van egyedi, azt, ha nincs, az alapértelmezettet)
+      final defaults = SERVICE_DEFINITIONS[serviceType] ?? {};
+      final custom = widget.vehicle?.customIntervals ?? {};
+      
+      if (KM_BASED_SERVICE_TYPES.contains(serviceType)) {
+        final val = custom['${serviceType}_km'] ?? defaults['intervalKm'];
+        _intervalKmControllers[serviceType] = TextEditingController(text: val?.toString() ?? '');
+      }
+      
+      if (DATE_BASED_SERVICE_TYPES.contains(serviceType)) {
+        final val = custom['${serviceType}_month'] ?? defaults['intervalHonap'];
+        // Megjelenítés években, ha osztható 12-vel, de tárolás hónapban
+        // Egyszerűsítés: Most hónapban írjuk ki/be, vagy évben? A mobilapp kódban hónap van.
+        // Maradjunk a hónapnál az egyszerűség kedvéért, vagy konvertáljunk.
+        // A mobil kódban: "Intervallum (év)" címke van, de months-ban tárol.
+        // Itt most hónapban jelenítem meg, hogy pontos legyen.
+        _intervalMonthControllers[serviceType] = TextEditingController(text: val?.toString() ?? '');
+      }
     }
   }
 
   @override
   void dispose() {
     _licensePlateController.dispose();
-    _makeController.dispose(); // Ezt is dobjuk
+    _makeController.dispose();
     _modelController.dispose();
     _yearController.dispose();
     _mileageController.dispose();
     _vinController.dispose();
     _serviceDateControllers.forEach((_, controller) => controller.dispose());
     _serviceMileageControllers.forEach((_, controller) => controller.dispose());
+    _intervalKmControllers.forEach((_, c) => c.dispose());
+    _intervalMonthControllers.forEach((_, c) => c.dispose());
     super.dispose();
   }
 
   void _onSave() {
     if (_formKey.currentState?.validate() ?? false) {
+      // Intervallumok összegyűjtése
+      final Map<String, int> customIntervals = {};
+      
+      _intervalKmControllers.forEach((type, controller) {
+        final val = int.tryParse(controller.text);
+        if (val != null) customIntervals['${type}_km'] = val;
+      });
+      
+      _intervalMonthControllers.forEach((type, controller) {
+        final val = int.tryParse(controller.text);
+        if (val != null) customIntervals['${type}_month'] = val;
+      });
+
       final vehicle = Jarmu(
         id: widget.vehicle?.id,
         licensePlate: _licensePlateController.text.toUpperCase(),
-        make: _makeController.text, // A controllerből vesszük az értéket
+        make: _makeController.text,
         model: _modelController.text,
         year: int.tryParse(_yearController.text) ?? 0,
         mileage: int.tryParse(_mileageController.text) ?? 0,
         vin: _vinController.text,
         vezerlesTipusa: _selectedVezerlesTipus,
+        customIntervals: customIntervals.isNotEmpty ? customIntervals : null,
       );
 
       final List<Szerviz> initialServices = [];
@@ -140,7 +175,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: theme.scaffoldBackgroundColor,
       child: SizedBox(
-        width: 700,
+        width: 800, // Szélesebb a több oszlop miatt
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -179,6 +214,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                   key: _formKey,
                   child: Column(
                     children: [
+                      // ALAPADATOK
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -196,7 +232,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                 Expanded(child: _buildModernField(controller: _licensePlateController, label: 'Rendszám', icon: Icons.badge, isRequired: true)),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  // KERESHETŐ GYÁRTMÁNY VÁLASZTÓ (AUTOCOMPLETE)
                                   child: LayoutBuilder(
                                     builder: (context, constraints) => Autocomplete<String>(
                                       initialValue: TextEditingValue(text: _makeController.text),
@@ -210,7 +245,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                         _makeController.text = selection;
                                       },
                                       fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                                        // Szinkronizáció
                                         if (_makeController.text.isNotEmpty && textEditingController.text.isEmpty) {
                                             textEditingController.text = _makeController.text;
                                         }
@@ -263,6 +297,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                       
                       const SizedBox(height: 24),
 
+                      // RÉSZLETES BEÁLLÍTÁSOK (KEZDETI ADATOK + INTERVALLUMOK)
                       Theme(
                         data: theme.copyWith(dividerColor: Colors.transparent),
                         child: Container(
@@ -273,22 +308,26 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                           ),
                           child: ExpansionTile(
                             tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            title: Text('Kezdeti szervizadatok (Opcionális)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[800])),
-                            leading: Icon(Icons.build, color: theme.colorScheme.primary),
+                            title: Text('Szerviz beállítások (Kezdeti adatok és Intervallumok)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[800])),
+                            leading: Icon(Icons.build_circle, color: theme.colorScheme.primary),
                             childrenPadding: const EdgeInsets.all(16),
                             children: ALL_REMINDER_SERVICE_TYPES.map((serviceType) {
                               final bool showKm = KM_BASED_SERVICE_TYPES.contains(serviceType);
+                              final bool showDate = DATE_BASED_SERVICE_TYPES.contains(serviceType);
                               final String dateLabel = _getDateLabel(serviceType);
                               final bool isVignette = serviceType == 'Pályamatrica';
 
                               return Padding(
-                                padding: const EdgeInsets.only(bottom: 12.0),
+                                padding: const EdgeInsets.only(bottom: 16.0),
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Text(serviceType, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    const SizedBox(height: 8),
                                     Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Expanded(flex: 2, child: Text(serviceType, style: const TextStyle(fontWeight: FontWeight.w500))),
-                                        const SizedBox(width: 16),
+                                        // Dátum
                                         Expanded(
                                           flex: 2,
                                           child: _buildModernField(
@@ -301,30 +340,67 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        Expanded(
-                                          flex: 2,
-                                          child: showKm && !isVignette ? _buildModernField(
-                                            controller: _serviceMileageControllers[serviceType]!,
-                                            label: 'Km állás',
-                                            icon: Icons.speed,
-                                            isNumber: true,
-                                            isRequired: false,
-                                            isSmall: true,
-                                          ) : const SizedBox(),
-                                        ),
+                                        // Km állás (ha van)
+                                        if (showKm && !isVignette) ...[
+                                          Expanded(
+                                            flex: 2,
+                                            child: _buildModernField(
+                                              controller: _serviceMileageControllers[serviceType]!,
+                                              label: 'Utolsó csere Km',
+                                              icon: Icons.speed,
+                                              isNumber: true,
+                                              isRequired: false,
+                                              isSmall: true,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
+                                        
+                                        // Intervallumok (ha nem matrica)
+                                        if (!isVignette) ...[
+                                          if (showKm) ...[
+                                            Expanded(
+                                              flex: 1,
+                                              child: _buildModernField(
+                                                controller: _intervalKmControllers[serviceType]!,
+                                                label: 'Int. (km)',
+                                                icon: Icons.repeat,
+                                                isNumber: true,
+                                                isRequired: false,
+                                                isSmall: true,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                          ],
+                                          if (showDate) ...[
+                                            Expanded(
+                                              flex: 1,
+                                              child: _buildModernField(
+                                                controller: _intervalMonthControllers[serviceType]!,
+                                                label: 'Int. (hó)',
+                                                icon: Icons.timelapse,
+                                                isNumber: true,
+                                                isRequired: false,
+                                                isSmall: true,
+                                              ),
+                                            ),
+                                          ]
+                                        ],
+                                        
+                                        if (isVignette)
+                                          Expanded(
+                                            flex: 2,
+                                            child: DropdownButtonFormField<String>(
+                                              value: _selectedVignetteType,
+                                              items: _vignetteTypes.map((type) => DropdownMenuItem(value: type, child: Text(type, style: const TextStyle(fontSize: 13)))).toList(),
+                                              onChanged: (value) => setState(() => _selectedVignetteType = value),
+                                              decoration: _buildInputDecoration(label: 'Típus', icon: Icons.timer, isSmall: true),
+                                              style: const TextStyle(fontSize: 13, color: Colors.black),
+                                            ),
+                                          ),
                                       ],
                                     ),
-                                    if (isVignette)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 8.0, left: 120),
-                                        child: DropdownButtonFormField<String>(
-                                          value: _selectedVignetteType,
-                                          items: _vignetteTypes.map((type) => DropdownMenuItem(value: type, child: Text(type, style: const TextStyle(fontSize: 13)))).toList(),
-                                          onChanged: (value) => setState(() => _selectedVignetteType = value),
-                                          decoration: _buildInputDecoration(label: 'Matrica típusa', icon: Icons.timer, isSmall: true),
-                                          style: const TextStyle(fontSize: 13, color: Colors.black),
-                                        ),
-                                      ),
+                                    const Divider(height: 24),
                                   ],
                                 ),
                               );

@@ -7,6 +7,7 @@ import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/ui/dialogs/service_editor_dialog.dart';
 import 'package:olajfolt_web/ui/dialogs/fueling_dialog.dart';
 import 'package:olajfolt_web/ui/widgets/service_list_item.dart';
+import 'package:olajfolt_web/ui/widgets/success_overlay.dart'; // ÚJ IMPORT
 
 class ServiceListView extends ConsumerWidget {
   final Jarmu? vehicle;
@@ -27,6 +28,9 @@ class ServiceListView extends ConsumerWidget {
 
     if (result != null) {
       await firestoreService.upsertService(user.uid, selectedVehicleId, result);
+      if (context.mounted) {
+        SuccessOverlay.show(context: context, message: service == null ? 'Szerviz hozzáadva!' : 'Szerviz frissítve!');
+      }
     }
   }
 
@@ -55,6 +59,9 @@ class ServiceListView extends ConsumerWidget {
 
     if (result != null) {
       await firestoreService.upsertService(user.uid, selectedVehicleId, result);
+      if (context.mounted) {
+        SuccessOverlay.show(context: context, message: 'Tankolás rögzítve!');
+      }
     }
   }
 
@@ -77,6 +84,8 @@ class ServiceListView extends ConsumerWidget {
       final selectedVehicleId = ref.read(selectedVehicleIdProvider);
       if (user != null && selectedVehicleId != null && service.id != null) {
         await firestoreService.deleteService(user.uid, selectedVehicleId, service.id!);
+        // Törlésnél nem szokás ekkora animációt, de egy SnackBar jól jöhet, vagy hagyjuk némán.
+        // A kérés "mentésnél hozzáadásnál" volt, így a törlést hagyom.
       }
     }
   }
@@ -91,41 +100,41 @@ class ServiceListView extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Row(
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            alignment: WrapAlignment.start,
             children: [
-              Expanded(
-                child: SizedBox(
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.local_gas_station, size: 24),
-                    label: const Text('Tankolás hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    onPressed: () {
-                      final services = servicesAsync.value ?? [];
-                      _openFuelingDialog(context, ref, services);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+              SizedBox(
+                width: 250,
+                height: 50,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.local_gas_station, size: 24),
+                  label: const Text('Tankolás hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  onPressed: () {
+                    final services = servicesAsync.value ?? [];
+                    _openFuelingDialog(context, ref, services);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: SizedBox(
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add, size: 28),
-                    label: const Text('Szerviz hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    onPressed: () => _openEditor(context, ref),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDark ? Colors.grey[800] : Colors.white,
-                      foregroundColor: isDark ? Colors.white : Colors.black,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+              SizedBox(
+                width: 250,
+                height: 50,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, size: 28),
+                  label: const Text('Szerviz hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  onPressed: () => _openEditor(context, ref),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+                    foregroundColor: isDark ? Colors.white : Colors.black,
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),
