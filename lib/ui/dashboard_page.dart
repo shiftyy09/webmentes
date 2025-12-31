@@ -7,6 +7,9 @@ import 'package:olajfolt_web/ui/home_page.dart';
 import 'package:olajfolt_web/ui/calculators/transfer_cost_page.dart';
 import 'package:olajfolt_web/ui/notification_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ÚJ IMPORT
+import 'package:intl/intl.dart'; // Dátumformázáshoz
 import 'dart:async';
 
 class DashboardPage extends ConsumerStatefulWidget {
@@ -22,35 +25,52 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   late AnimationController _fadeController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  
   Timer? _safetyTimer;
+  bool _isOnline = true;
+  StreamSubscription? _connectivitySubscription;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     
-    _iconController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
+    Connectivity().checkConnectivity().then((results) {
+      _updateConnectionStatus(results);
+    });
+
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
+      _updateConnectionStatus(results);
+    });
+    
+    _iconController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
     _scaleAnimation = CurvedAnimation(parent: _iconController, curve: Curves.elasticOut);
     
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
+    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(_fadeController);
 
-    // Biztosítjuk, hogy a build után induljon az animáció
+    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(_pulseController);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startAnimationSequence();
     });
 
-    // BIZTONSÁGI IDŐZÍTŐ: Ha bármi miatt nem futna le az animáció, 3 mp után mindenképp eltűnik az intro
     _safetyTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && _showIntro) {
         setState(() => _showIntro = false);
       }
     });
+  }
+
+  void _updateConnectionStatus(List<ConnectivityResult> results) {
+    final isOnline = !results.contains(ConnectivityResult.none);
+    if (isOnline != _isOnline && mounted) {
+      setState(() => _isOnline = isOnline);
+    }
   }
 
   Future<void> _startAnimationSequence() async {
@@ -59,21 +79,29 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
       await Future.delayed(const Duration(milliseconds: 500));
       await _fadeController.forward().orCancel;
     } catch (e) {
-      // Animáció megszakítva vagy hiba
+      // ignore
     } finally {
-      if (mounted) {
-        setState(() {
-          _showIntro = false;
-        });
-      }
+      if (mounted) setState(() => _showIntro = false);
     }
+  }
+
+  Future<void> _manualRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    
+    ref.refresh(vehiclesProvider);
+    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    if (mounted) setState(() => _isRefreshing = false);
   }
 
   @override
   void dispose() {
     _iconController.dispose();
     _fadeController.dispose();
+    _pulseController.dispose();
     _safetyTimer?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
@@ -87,7 +115,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
     return Scaffold(
       body: Stack(
         children: [
-          // --- FŐ TARTALOM (Ami az animáció mögött van) ---
           Scaffold(
             appBar: AppBar(
               backgroundColor: const Color(0xFF1E1E1E),
@@ -106,7 +133,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                 if (auth != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Center(child: Text(auth.email ?? '', style: const TextStyle(fontSize: 14))),
+                    child: Row(
+                      children: [
+                        const Tooltip(message: 'Fiók szinkronizálva', child: Icon(Icons.cloud_done, color: Colors.green, size: 20)),
+                        const SizedBox(width: 8),
+                        Text(auth.email ?? '', style: const TextStyle(fontSize: 14)),
+                      ],
+                    ),
                   ),
                 TextButton(
                   onPressed: () async => await authService.signOut(),
@@ -199,13 +232,109 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
             ),
           ),
 
-          // --- INTRO OVERLAY (A WOW HATÁS) ---
+          // --- VALÓS STÁTUSZ JELZŐ (HEARTBEAT ALAPJÁN) ---
+          if (auth != null)
+            Positioned(
+              bottom: 24,
+              right: 24,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isOnline) ...[
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _manualRefresh,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: _isRefreshing 
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.refresh, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+
+                  // HEARTBEAT FIGYELŐ
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance.collection('users').doc(auth.uid).snapshots(),
+                    builder: (context, snapshot) {
+                      String statusText = 'Kapcsolódás...';
+                      Color statusColor = Colors.grey;
+                      bool isPhoneActive = false;
+
+                      if (!_isOnline) {
+                        statusText = 'Nincs internetkapcsolat';
+                        statusColor = Colors.redAccent;
+                      } else if (snapshot.hasData && snapshot.data!.exists) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>?;
+                        final lastSync = data?['lastAppSync'] as Timestamp?;
+                        
+                        if (lastSync != null) {
+                          final diff = DateTime.now().difference(lastSync.toDate());
+                          if (diff.inMinutes < 15) {
+                            statusText = 'Mobilapp szinkronizálva';
+                            statusColor = Colors.greenAccent;
+                            isPhoneActive = true;
+                          } else if (diff.inHours < 24) {
+                            statusText = 'Mobil utoljára aktív: ${diff.inHours} órája';
+                            statusColor = Colors.orangeAccent;
+                          } else {
+                            statusText = 'Mobil inaktív (>1 napja)';
+                            statusColor = Colors.grey;
+                          }
+                        } else {
+                          statusText = 'Mobilapp még nem csatlakozott';
+                          statusColor = Colors.orangeAccent;
+                        }
+                      }
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(color: statusColor.withOpacity(0.2), blurRadius: 10, spreadRadius: 2),
+                          ],
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isPhoneActive)
+                              FadeTransition(
+                                opacity: _pulseAnimation,
+                                child: Container(width: 10, height: 10, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle, boxShadow: [BoxShadow(color: statusColor, blurRadius: 6, spreadRadius: 1)])),
+                              )
+                            else
+                              Container(width: 10, height: 10, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                            const SizedBox(width: 12),
+                            Text(statusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(width: 4),
+                            Icon(isPhoneActive ? Icons.phonelink_ring : Icons.phonelink_off, color: Colors.white54, size: 16),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
           if (_showIntro)
             Positioned.fill(
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: Container(
-                  color: const Color(0xFF101010), // Sötét háttér
+                  color: const Color(0xFF101010),
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -217,44 +346,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                             decoration: BoxDecoration(
                               color: Colors.green.withOpacity(0.1),
                               shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.green.withOpacity(0.5),
-                                  blurRadius: 50,
-                                  spreadRadius: 10,
-                                )
-                              ],
+                              boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 50, spreadRadius: 10)],
                               border: Border.all(color: Colors.green, width: 2),
                             ),
                             child: const Icon(Icons.check, size: 80, color: Colors.greenAccent),
                           ),
                         ),
                         const SizedBox(height: 40),
-                        const Text(
-                          'Sikeres bejelentkezés',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
+                        const Text('Sikeres bejelentkezés', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                         const SizedBox(height: 16),
-                        const Text(
-                          'Adatok szinkronizálása...',
-                          style: TextStyle(
-                            color: Colors.white54,
-                            fontSize: 16,
-                          ),
-                        ),
+                        const Text('Adatok szinkronizálása...', style: TextStyle(color: Colors.white54, fontSize: 16)),
                         const SizedBox(height: 30),
-                        const SizedBox(
-                          width: 200,
-                          child: LinearProgressIndicator(
-                            color: Colors.green,
-                            backgroundColor: Colors.white10,
-                          ),
-                        ),
+                        const SizedBox(width: 200, child: LinearProgressIndicator(color: Colors.green, backgroundColor: Colors.white10)),
                       ],
                     ),
                   ),
@@ -277,45 +380,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF00C853).withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          )
-        ],
+        boxShadow: [BoxShadow(color: const Color(0xFF00C853).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5))],
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.android, size: 32, color: Colors.white),
-          ),
+          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle), child: const Icon(Icons.android, size: 32, color: Colors.white)),
           const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Teljes szinkronizáció web és app között',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Az adatok automatikusan frissülnek mindkét felületen.',
-                  style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
-                ),
-              ],
-            ),
-          ),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Teljes szinkronizáció web és app között', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Text('Az adatok automatikusan frissülnek mindkét felületen.', style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14))])),
           const SizedBox(width: 20),
           ElevatedButton.icon(
             onPressed: () async {
@@ -324,12 +395,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
             },
             icon: const Icon(Icons.download, size: 18, color: Color(0xFF1B5E20)),
             label: const Text('LETÖLTÉS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20))),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 2,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 2),
           ),
         ],
       ),
@@ -344,13 +410,7 @@ class _MenuCard extends StatefulWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _MenuCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
+  const _MenuCard({required this.title, required this.subtitle, required this.icon, required this.color, required this.onTap});
 
   @override
   State<_MenuCard> createState() => _MenuCardState();
@@ -374,36 +434,16 @@ class _MenuCardState extends State<_MenuCard> {
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(24),
           border: _isHovered ? Border.all(color: widget.color, width: 2) : Border.all(color: Colors.transparent, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: _isHovered ? widget.color.withOpacity(0.3) : Colors.black.withOpacity(0.1),
-              blurRadius: _isHovered ? 20 : 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: _isHovered ? widget.color.withOpacity(0.3) : Colors.black.withOpacity(0.1), blurRadius: _isHovered ? 20 : 10, offset: const Offset(0, 5))],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: widget.color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(widget.icon, size: 40, color: widget.color),
-            ),
+            Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: widget.color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(widget.icon, size: 40, color: widget.color)),
             const SizedBox(height: 20),
-            Text(
-              widget.title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-            ),
+            Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
             const SizedBox(height: 8),
-            Text(
-              widget.subtitle,
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
+            Text(widget.subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
           ],
         ),
       ),

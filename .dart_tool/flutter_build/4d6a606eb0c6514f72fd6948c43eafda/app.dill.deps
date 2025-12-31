@@ -21,7 +21,6 @@ file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/
 file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/home_page.dart
 file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/login_page.dart
 file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/notification_settings_page.dart
-file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/vehicle_notification_details_page.dart
 file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/widgets/maintenance_reminder_view.dart
 file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/widgets/service_list_item.dart
 file:///C:/Users/archi/AndroidStudioProjects/car_maintenance_app/web_app/lib/ui/widgets/service_list_view.dart
@@ -275,6 +274,13 @@ file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1/
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1/lib/src/unmodifiable_wrappers.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1/lib/src/utils.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1/lib/src/wrappers.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus-6.1.5/lib/connectivity_plus.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus-6.1.5/lib/src/connectivity_plus_web.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus-6.1.5/lib/src/web/dart_html_connectivity_plugin.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus_platform_interface-2.0.1/lib/connectivity_plus_platform_interface.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus_platform_interface-2.0.1/lib/method_channel_connectivity.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus_platform_interface-2.0.1/lib/src/enums.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/connectivity_plus_platform_interface-2.0.1/lib/src/utils.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/crypto-3.0.7/lib/crypto.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/crypto-3.0.7/lib/src/digest.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/crypto-3.0.7/lib/src/digest_sink.dart
@@ -1121,6 +1127,7 @@ file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/petitparser-7.0.1/
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/petitparser-7.0.1/lib/src/shared/types.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/plugin_platform_interface-2.1.8/lib/plugin_platform_interface.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/printing.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/printing_web.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/asset_utils.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/cache.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/callback.dart
@@ -1132,6 +1139,7 @@ file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/li
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/method_channel_js.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/mutex.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/output_type.dart
+file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/pdfjs.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/platform_js.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/preview/action_bar_theme.dart
 file:///C:/Users/archi/AppData/Local/Pub/Cache/hosted/pub.dev/printing-5.14.2/lib/src/preview/actions.dart

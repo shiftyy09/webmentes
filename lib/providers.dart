@@ -19,9 +19,10 @@ class AuthService {
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  // Visszaállítva a megbízhatóbb, webes felugró ablakos módra
   Future<void> signInWithGoogleWeb() async {
     final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-    await _auth.signInWithRedirect(googleProvider);
+    await _auth.signInWithPopup(googleProvider);
   }
 
   Future<UserCredential> signUpWithEmail(String email, String password) async {

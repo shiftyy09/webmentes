@@ -26,6 +26,30 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  // ÚJ: Hibaüzenet fordító
+  String _getErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return 'Nincs ilyen felhasználó ezzel az e-mail címmel.';
+      case 'wrong-password':
+        return 'Hibás jelszó. Próbáld újra!';
+      case 'email-already-in-use':
+        return 'Ez az e-mail cím már regisztrálva van.';
+      case 'invalid-email':
+        return 'Érvénytelen e-mail formátum.';
+      case 'weak-password':
+        return 'Túl gyenge jelszó (min. 6 karakter).';
+      case 'network-request-failed':
+        return 'Hálózati hiba. Ellenőrizd az internetkapcsolatot!';
+      case 'too-many-requests':
+        return 'Túl sok sikertelen próbálkozás. Próbáld újra később.';
+      case 'user-disabled':
+        return 'Ezt a felhasználói fiókot letiltották.';
+      default:
+        return 'Hiba történt: ${e.message}';
+    }
+  }
+
   Future<void> _submit() async {
     if (_isLoading) return;
     setState(() {
@@ -48,7 +72,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _errorText = e.message ?? 'Ismeretlen hiba');
+      setState(() => _errorText = _getErrorMessage(e)); // Itt használjuk a fordítót
+    } catch (e) {
+      setState(() => _errorText = 'Ismeretlen hiba történt.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -84,7 +110,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Mobilon a logó itt jelenik meg
                         if (!isLargeScreen) ...[
                           Center(
                             child: Image.asset('assets/olajfoltweb.png', width: 120, height: 120),
@@ -189,7 +214,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             ),
           ),
 
-          // JOBB OLDAL - INFORMÁCIÓS PANEL (Csak nagy képernyőn)
           if (isLargeScreen)
             Expanded(
               flex: 3,
@@ -207,7 +231,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // LOGÓ
                       Image.asset('assets/olajfoltweb.png', width: 250, fit: BoxFit.contain),
                       const SizedBox(height: 40),
                       
@@ -223,7 +246,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       
                       const SizedBox(height: 60),
 
-                      // MOBILAPP PROMÓ
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -257,7 +279,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
                       const Spacer(),
 
-                      // LÁBLÉC
                       const Divider(color: Colors.white24),
                       const SizedBox(height: 16),
                       Row(

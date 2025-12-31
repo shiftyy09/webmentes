@@ -23,6 +23,9 @@ dependencies:
   # PDF Generáláshoz
   pdf: ^3.10.0
   printing: ^5.11.0
+  
+  # Hálózati kapcsolat figyelése
+  connectivity_plus: ^6.0.3
 
 dev_dependencies:
   flutter_test:
