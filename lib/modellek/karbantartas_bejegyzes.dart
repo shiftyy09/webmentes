@@ -16,6 +16,23 @@ class Szerviz {
     required this.mileage,
   });
 
+  // ÚJ: copyWith metódus
+  Szerviz copyWith({
+    String? id,
+    String? description,
+    DateTime? date,
+    num? cost,
+    int? mileage,
+  }) {
+    return Szerviz(
+      id: id ?? this.id,
+      description: description ?? this.description,
+      date: date ?? this.date,
+      cost: cost ?? this.cost,
+      mileage: mileage ?? this.mileage,
+    );
+  }
+
   factory Szerviz.fromFirestore(
     Map<String, dynamic> data, {
     String? documentId,

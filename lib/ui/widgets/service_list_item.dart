@@ -9,12 +9,14 @@ class ServiceListItem extends StatelessWidget {
   final Szerviz service;
   final Function(Szerviz) onEdit;
   final Function(Szerviz) onDelete;
+  final bool isRefueling; // ÚJ PARAMÉTER
 
   const ServiceListItem({
     super.key,
     required this.service,
     required this.onEdit,
     required this.onDelete,
+    this.isRefueling = false, // Alapértelmezetten false
   });
 
   @override
@@ -27,9 +29,11 @@ class ServiceListItem extends StatelessWidget {
     Color typeColor = Colors.grey;
 
     final descLower = service.description.toLowerCase();
-    if (descLower.contains('tankolás')) {
+    
+    // Ha explicit tankolás, vagy a leírásban benne van
+    if (isRefueling || descLower.contains('tankolás')) {
       typeIcon = Icons.local_gas_station;
-      typeColor = Colors.orange;
+      typeColor = Colors.green; // Zöld szín a tankoláshoz a fülhöz igazodva
     } else if (descLower.contains('olaj')) {
       typeIcon = Icons.oil_barrel;
       typeColor = Colors.black87;
@@ -38,7 +42,7 @@ class ServiceListItem extends StatelessWidget {
       typeColor = Colors.blue;
     } else if (descLower.contains('biztosítás') || descLower.contains('casco')) {
       typeIcon = Icons.security;
-      typeColor = Colors.green;
+      typeColor = Colors.teal;
     } else if (descLower.contains('matrica')) {
       typeIcon = Icons.confirmation_number;
       typeColor = Colors.purple;

@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:olajfolt_web/modellek/jarmu.dart';
-import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
 import 'package:olajfolt_web/services/pdf_service.dart';
@@ -99,6 +98,7 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
         }
 
         final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
 
         return Column(
           children: [
@@ -146,24 +146,35 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Container(
-                height: 40,
+                height: 45, // Kicsit magasabb a kényelemért
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.05),
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: TabBar(
                   controller: _tabController,
-                  indicatorSize: TabBarIndicatorSize.tab,
+                  // JAVÍTVA: A teljes tabot kitöltő indicator
+                  indicatorSize: TabBarIndicatorSize.tab, 
                   indicator: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
-                    color: theme.colorScheme.primary,
+                    color: isDark ? Colors.grey[800] : Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      )
+                    ]
                   ),
-                  labelColor: theme.brightness == Brightness.light ? Colors.white : Colors.black,
-                  unselectedLabelColor: theme.textTheme.bodyMedium?.color,
+                  // JAVÍTVA: Kontrasztos fekete/fehér szöveg
+                  labelColor: isDark ? Colors.white : Colors.black,
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  unselectedLabelColor: isDark ? Colors.grey[400] : Colors.grey[700],
+                  dividerColor: Colors.transparent,
                   tabs: const [
-                    Tab(text: 'KARBANTARTÁS'),
-                    Tab(text: 'SZERVIZ'),
-                    Tab(text: 'ADATOK'),
+                    Tab(text: 'EMLÉKEZTETŐK'),
+                    Tab(text: 'NAPLÓ'),
+                    Tab(text: 'ADATLAP'),
                     Tab(text: 'STATISZTIKA'),
                   ],
                 ),
@@ -175,10 +186,10 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
                 controller: _tabController,
                 children: [
                   MaintenanceReminderView(vehicle: vehicle),
-                  const ServiceListView(), // Már nem kell vehicle, mert nem itt van a PDF
+                  const ServiceListView(),
                   VehicleDataView(
                     vehicle: vehicle, 
-                    onExportPdf: () => _exportPdf(vehicle), // Itt adjuk át a callback-et
+                    onExportPdf: () => _exportPdf(vehicle),
                   ),
                   const VehicleStatsView(),
                 ],

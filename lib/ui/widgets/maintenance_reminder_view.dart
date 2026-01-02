@@ -7,7 +7,8 @@ import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
-import 'package:olajfolt_web/ui/widgets/success_overlay.dart'; // ÚJ IMPORT
+import 'package:olajfolt_web/ui/widgets/success_overlay.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MaintenanceReminderView extends ConsumerStatefulWidget {
   final Jarmu vehicle;
@@ -61,7 +62,6 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
         await firestoreService.upsertVehicle(user.uid, updatedVehicle);
         
         if (mounted) {
-          // Itt hívjuk meg az új overlay-t a zöld keret helyett
           SuccessOverlay.show(context: context, message: 'Km óra frissítve!');
         }
       }
@@ -72,14 +72,138 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
     }
   }
 
+  // JAVÍTVA: Teljeskörű szerkesztő (Utolsó szerviz + Intervallum)
+  Future<void> _editReminderDetails(BuildContext context, String serviceType, Szerviz? lastService, int? currentIntervalKm, int? currentIntervalMonth) async {
+    final lastKmController = TextEditingController(text: lastService?.mileage.toString() ?? '');
+    final lastDateController = TextEditingController(text: lastService != null ? DateFormat('yyyy.MM.dd').format(lastService.date) : '');
+    
+    final intervalKmController = TextEditingController(text: currentIntervalKm?.toString() ?? '');
+    final intervalMonthController = TextEditingController(text: currentIntervalMonth?.toString() ?? '');
+    
+    final bool showKm = KM_BASED_SERVICE_TYPES.contains(serviceType);
+    final bool showDate = DATE_BASED_SERVICE_TYPES.contains(serviceType);
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(_getIconForType(serviceType), color: Colors.orange),
+            const SizedBox(width: 12),
+            Text('$serviceType szerkesztése', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('UTOLSÓ ELVÉGZETT SZERVIZ ADATAI', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 12),
+              if (showKm)
+                TextField(
+                  controller: lastKmController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Utolsó csere km-állása', suffixText: 'km', border: OutlineInputBorder(), prefixIcon: Icon(Icons.speed)),
+                ),
+              if (showKm && showDate) const SizedBox(height: 16),
+              if (showDate)
+                TextField(
+                  controller: lastDateController,
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'Utolsó esemény dátuma', border: OutlineInputBorder(), prefixIcon: Icon(Icons.calendar_today)),
+                  onTap: () async {
+                    final picked = await showDatePicker(context: context, initialDate: lastService?.date ?? DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime.now());
+                    if (picked != null) lastDateController.text = DateFormat('yyyy.MM.dd').format(picked);
+                  },
+                ),
+              
+              const SizedBox(height: 24),
+              const Text('INTERVALLUM BEÁLLÍTÁSOK', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 12),
+              
+              if (showKm)
+                TextField(
+                  controller: intervalKmController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Intervallum (km)', suffixText: 'km', border: OutlineInputBorder(), prefixIcon: Icon(Icons.repeat)),
+                ),
+              if (showKm && showDate) const SizedBox(height: 16),
+              if (showDate)
+                TextField(
+                  controller: intervalMonthController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Intervallum (hónap)', suffixText: 'hó', border: OutlineInputBorder(), prefixIcon: Icon(Icons.timelapse)),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Mégse')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+            child: const Text('Mentés'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final user = ref.read(authStateProvider).value;
+      if (user == null || widget.vehicle.id == null) return;
+      final firestoreService = ref.read(firestoreServiceProvider);
+
+      // 1. Intervallumok mentése (Jármű frissítése)
+      final Map<String, int> newIntervals = Map.from(widget.vehicle.customIntervals ?? {});
+      if (showKm) {
+        final val = int.tryParse(intervalKmController.text);
+        if (val != null) newIntervals['${serviceType}_km'] = val;
+      }
+      if (showDate) {
+        final val = int.tryParse(intervalMonthController.text);
+        if (val != null) newIntervals['${serviceType}_month'] = val;
+      }
+      
+      final updatedVehicle = widget.vehicle.copyWith(customIntervals: newIntervals);
+      await firestoreService.upsertVehicle(user.uid, updatedVehicle);
+
+      // 2. Utolsó szerviz adatának frissítése (Vagy létrehozása)
+      // Ha volt lastService, azt frissítjük. Ha nem volt, újat hozunk létre (de csak ha van kitöltött adat).
+      int? newLastKm = int.tryParse(lastKmController.text);
+      DateTime? newLastDate;
+      try { newLastDate = DateFormat('yyyy.MM.dd').parse(lastDateController.text); } catch (_) {}
+
+      if (lastService != null) {
+        // Meglévő frissítése
+        final updatedService = lastService.copyWith(
+          mileage: newLastKm ?? lastService.mileage,
+          date: newLastDate ?? lastService.date,
+        );
+        await firestoreService.upsertService(user.uid, widget.vehicle.id!, updatedService);
+      } else if (newLastDate != null || newLastKm != null) {
+        // Új létrehozása ("Emlékeztető alap")
+        final newService = Szerviz(
+          description: '$REMINDER_PREFIX$serviceType',
+          date: newLastDate ?? DateTime.now(),
+          mileage: newLastKm ?? 0,
+          cost: 0,
+        );
+        await firestoreService.upsertService(user.uid, widget.vehicle.id!, newService);
+      }
+      
+      if (mounted) SuccessOverlay.show(context: context, message: 'Adatok frissítve!');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final servicesAsync = ref.watch(servicesForSelectedVehicleProvider);
     final theme = Theme.of(context);
-    final numberFormat = NumberFormat.decimalPattern('hu_HU');
 
     return Column(
       children: [
+        // KM ÓRA FRISSÍTŐ (Változatlan)
         Center(
           child: Container(
             width: 400,
@@ -88,57 +212,17 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(50),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05), 
-                  blurRadius: 10, 
-                  offset: const Offset(0, 4)
-                )
-              ],
-              border: Border.all(
-                color: theme.colorScheme.primary.withOpacity(0.2), 
-                width: 1
-              ),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 1),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1), 
-                    shape: BoxShape.circle
-                  ),
-                  child: Icon(Icons.speed, size: 24, color: theme.colorScheme.primary),
-                ),
+                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Icons.speed, size: 24, color: theme.colorScheme.primary)),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _mileageController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                      border: InputBorder.none,
-                      hintText: 'Km állás',
-                      suffixText: 'km',
-                    ),
-                    onSubmitted: (_) => _updateMileage(),
-                  ),
-                ),
+                Expanded(child: TextField(controller: _mileageController, keyboardType: TextInputType.number, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.zero, border: InputBorder.none, hintText: 'Km állás', suffixText: 'km'), onSubmitted: (_) => _updateMileage())),
                 const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _isUpdating ? null : _updateMileage,
-                  icon: _isUpdating 
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(
-                          Icons.cloud_upload_outlined, // Marad a felhő, mert a siker animáció külön jön
-                          size: 32,
-                          color: theme.colorScheme.primary
-                        ),
-                  tooltip: 'Frissítés mentése',
-                ),
+                IconButton(onPressed: _isUpdating ? null : _updateMileage, icon: _isUpdating ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(Icons.cloud_upload_outlined, size: 32, color: theme.colorScheme.primary), tooltip: 'Frissítés mentése'),
               ],
             ),
           ),
@@ -168,7 +252,6 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
   }
 
   Widget _buildReminderCard(BuildContext context, String type, List<Szerviz> services, int currentKm) {
-    final theme = Theme.of(context);
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
     final dateFormat = DateFormat('yyyy.MM.dd');
 
@@ -183,8 +266,10 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
     } catch (e) { /* Nincs adat */ }
 
     final defs = SERVICE_DEFINITIONS[type] ?? {};
-    final int? intervalKm = defs['intervalKm'];
-    final int? intervalMonths = defs['intervalHonap'];
+    final custom = widget.vehicle.customIntervals ?? {};
+    
+    final int? intervalKm = custom['${type}_km'] ?? defs['intervalKm'];
+    final int? intervalMonths = custom['${type}_month'] ?? defs['intervalHonap'];
 
     double progress = 0.0;
     Color statusColor = Colors.grey;
@@ -217,54 +302,59 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: statusColor.withOpacity(0.3), width: 1)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                  child: Icon(_getIconForType(type), color: statusColor, size: 24),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(12)),
-                  child: Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-            const Spacer(),
-            Text(type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (lastService != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Text('Utolsó: ${dateFormat.format(lastService.date)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ),
-            const Spacer(),
-            if (lastService != null) ...[
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        // JAVÍTVA: A teljes kártya kattintható a szerkesztéshez
+        onTap: () => _editReminderDetails(context, type, lastService, intervalKm, intervalMonths),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: Text(detailText, style: TextStyle(fontSize: 12, color: statusColor, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Icon(_getIconForType(type), color: statusColor, size: 24),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(12)),
+                    child: Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 6,
-                  backgroundColor: Colors.grey.withOpacity(0.1),
-                  valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              const Spacer(),
+              Text(type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (lastService != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text('Utolsó: ${dateFormat.format(lastService.date)}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ),
-              ),
-            ] else 
-              const Text('Nincs rögzített adat', style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
-          ],
+              const Spacer(),
+              if (lastService != null) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text(detailText, style: TextStyle(fontSize: 12, color: statusColor, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: Colors.grey.withOpacity(0.1),
+                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                  ),
+                ),
+              ] else 
+                const Text('Nincs rögzített adat', style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
+            ],
+          ),
         ),
       ),
     );

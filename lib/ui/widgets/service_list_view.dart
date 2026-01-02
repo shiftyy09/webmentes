@@ -7,7 +7,7 @@ import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/ui/dialogs/service_editor_dialog.dart';
 import 'package:olajfolt_web/ui/dialogs/fueling_dialog.dart';
 import 'package:olajfolt_web/ui/widgets/service_list_item.dart';
-import 'package:olajfolt_web/ui/widgets/success_overlay.dart'; // ÚJ IMPORT
+import 'package:olajfolt_web/ui/widgets/success_overlay.dart';
 
 class ServiceListView extends ConsumerWidget {
   final Jarmu? vehicle;
@@ -70,7 +70,7 @@ class ServiceListView extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Törlés megerősítése'),
-        content: const Text('Biztosan törölni szeretnéd ezt a szervizbejegyzést?'),
+        content: const Text('Biztosan törölni szeretnéd ezt a bejegyzést?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Mégse')),
           TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Törlés')),
@@ -84,8 +84,6 @@ class ServiceListView extends ConsumerWidget {
       final selectedVehicleId = ref.read(selectedVehicleIdProvider);
       if (user != null && selectedVehicleId != null && service.id != null) {
         await firestoreService.deleteService(user.uid, selectedVehicleId, service.id!);
-        // Törlésnél nem szokás ekkora animációt, de egy SnackBar jól jöhet, vagy hagyjuk némán.
-        // A kérés "mentésnél hozzáadásnál" volt, így a törlést hagyom.
       }
     }
   }
@@ -96,82 +94,137 @@ class ServiceListView extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            alignment: WrapAlignment.start,
-            children: [
-              SizedBox(
-                width: 250,
-                height: 50,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.local_gas_station, size: 24),
-                  label: const Text('Tankolás hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  onPressed: () {
-                    final services = servicesAsync.value ?? [];
-                    _openFuelingDialog(context, ref, services);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            color: theme.scaffoldBackgroundColor,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 45,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[900] : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TabBar(
+                      // JAVÍTVA: Teljes kitöltés
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: BoxDecoration(
+                        color: theme.colorScheme.primary, // Narancs (vagy ami a téma)
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))
+                        ]
+                      ),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: Colors.grey,
+                      labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      dividerColor: Colors.transparent,
+                      tabs: const [
+                        Tab(text: 'SZERVIZNAPLÓ', icon: Icon(Icons.build)),
+                        Tab(text: 'TANKOLÁSI NAPLÓ', icon: Icon(Icons.local_gas_station)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(
-                width: 250,
-                height: 50,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.add, size: 28),
-                  label: const Text('Szerviz hozzáadása', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  onPressed: () => _openEditor(context, ref),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark ? Colors.grey[800] : Colors.white,
-                    foregroundColor: isDark ? Colors.white : Colors.black,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                const SizedBox(width: 24),
+                
+                // JAVÍTVA: Hosszú szöveges gombok
+                Wrap(
+                  spacing: 16,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.local_gas_station),
+                      label: const Text('Tankolás hozzáadása'),
+                      onPressed: () {
+                        final services = servicesAsync.value ?? [];
+                        _openFuelingDialog(context, ref, services);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDark ? Colors.grey[800] : Colors.white,
+                        foregroundColor: isDark ? Colors.white : Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Szerviz hozzáadása'),
+                      onPressed: () => _openEditor(context, ref),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        
-        Expanded(
-          child: servicesAsync.when(
-            data: (services) {
-              if (services.isEmpty) {
-                return const Center(child: Text('Ehhez a járműhöz még nincsenek szervizbejegyzések.'));
-              }
-              return GridView.builder(
-                padding: const EdgeInsets.all(16.0),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 300, 
-                  childAspectRatio: 1.4,   
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: services.length,
-                itemBuilder: (context, index) {
-                  final service = services[index];
-                  return ServiceListItem(
-                    service: service,
-                    onEdit: (s) => _openEditor(context, ref, service: s),
-                    onDelete: (s) => _deleteService(context, ref, s),
-                  );
-                },
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, stack) => Center(child: Text('Hiba: $err')),
+          
+          Expanded(
+            child: servicesAsync.when(
+              data: (allServices) {
+                final services = allServices.where((s) => !s.description.toLowerCase().contains('tankolás')).toList();
+                final refuelings = allServices.where((s) => s.description.toLowerCase().contains('tankolás')).toList();
+
+                return TabBarView(
+                  children: [
+                    services.isEmpty
+                        ? const Center(child: Text('Nincsenek szervizbejegyzések.'))
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(16.0),
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 300, 
+                              childAspectRatio: 1.4,   
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: services.length,
+                            itemBuilder: (context, index) {
+                              return ServiceListItem(
+                                service: services[index],
+                                onEdit: (s) => _openEditor(context, ref, service: s),
+                                onDelete: (s) => _deleteService(context, ref, s),
+                              );
+                            },
+                          ),
+
+                    refuelings.isEmpty
+                        ? const Center(child: Text('Nincsenek tankolási adatok.'))
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(16.0),
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 300, 
+                              childAspectRatio: 1.4,   
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: refuelings.length,
+                            itemBuilder: (context, index) {
+                              return ServiceListItem(
+                                service: refuelings[index],
+                                onEdit: (s) => _openEditor(context, ref, service: s),
+                                onDelete: (s) => _deleteService(context, ref, s),
+                                isRefueling: true,
+                              );
+                            },
+                          ),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('Hiba: $err')),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

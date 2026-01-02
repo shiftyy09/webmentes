@@ -15,7 +15,6 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
   final _kwController = TextEditingController();
   final _cm3Controller = TextEditingController();
   
-  // Eredmények
   int? _eredetvizsga;
   int? _illetek;
   final int _forgalmi = 6000;
@@ -23,7 +22,6 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
   int? _total;
 
   void _calculate() {
-    // 1. INPUT VALIDÁCIÓ
     final year = int.tryParse(_yearController.text);
     final kw = int.tryParse(_kwController.text);
     final cm3 = int.tryParse(_cm3Controller.text);
@@ -35,7 +33,7 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
       return;
     }
 
-    // 2. EREDETVIZSGA SZÁMÍTÁS
+    // Eredetvizsga
     int eredetAr = 0;
     if (cm3 <= 1400) {
       eredetAr = 17000;
@@ -45,28 +43,28 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
       eredetAr = 20000;
     }
 
-    // 3. ILLETÉK SZÁMÍTÁS
+    // Vagyonszerzési illeték
     final currentYear = DateTime.now().year;
     final age = currentYear - year;
     
     int rate = 0;
 
-    if (age <= 3) { // 0-3 év
+    if (age <= 3) {
       if (kw <= 40) rate = 345;
       else if (kw <= 80) rate = 450;
       else if (kw <= 120) rate = 550;
       else rate = 850;
-    } else if (age <= 8) { // 4-8 év
+    } else if (age <= 8) {
       if (kw <= 40) rate = 300;
       else if (kw <= 80) rate = 395;
       else if (kw <= 120) rate = 450;
       else rate = 650;
-    } else if (age <= 12) { // 9-12 év
+    } else if (age <= 12) {
        if (kw <= 40) rate = 230;
       else if (kw <= 80) rate = 300;
       else if (kw <= 120) rate = 300;
       else rate = 460;
-    } else { // >12 év
+    } else {
       if (kw <= 40) rate = 185;
       else if (kw <= 80) rate = 230;
       else if (kw <= 120) rate = 230;
@@ -118,7 +116,7 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
                           children: [
                             Expanded(child: _buildInputField(controller: _kwController, label: 'Teljesítmény', icon: Icons.bolt, suffix: 'kW')),
                             const SizedBox(width: 16),
-                            // ITT A CSERE: Icons.settings (Fogaskerék) a motorhoz
+                            // JAVÍTVA: Icons.settings használata Icons.engine helyett
                             Expanded(child: _buildInputField(controller: _cm3Controller, label: 'Lökettérfogat', icon: Icons.settings, suffix: 'cm³')),
                           ],
                         ),
@@ -147,7 +145,7 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
                 // EREDMÉNY KÁRTYA
                 if (_total != null)
                   Card(
-                    color: const Color(0xFF1E1E1E),
+                    color: const Color(0xFF1E1E1E), // Sötét kártya az eredménynek
                     elevation: 8,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
@@ -197,6 +195,7 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
         prefixIcon: Icon(icon, color: Colors.grey),
         suffixText: suffix,
         filled: true,
+        // fillColor: Colors.white, // Opcionális, ha a háttér nem fehér
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
     );
