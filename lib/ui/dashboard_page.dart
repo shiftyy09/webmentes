@@ -117,13 +117,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
         children: [
           // KÉP HOZZÁADÁSA A JOBB ALSÓ SAROKBA
           Positioned(
-            bottom: 70, // Még feljebb hozva
+            bottom: 75,
             right: 0,
             child: Opacity(
-              opacity: 1.0, // Teljesen látható
+              opacity: 1.0, 
               child: Image.asset(
                 'assets/hatterweb.png',
-                width: 500, // Kicsit kisebb
+                width: 500, 
                 fit: BoxFit.contain,
               ),
             ),
@@ -227,14 +227,28 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const Text('Készítette: ', style: TextStyle(color: Colors.white54, fontSize: 12)),
                           InkWell(
                             onTap: () async {
-                              final url = Uri.parse('https://nj-creative.hu');
+                              final url = Uri.parse('https://www.facebook.com/profile.php?id=61573034549610');
                               if (await canLaunchUrl(url)) await launchUrl(url);
                             },
-                            child: const Text('NJ-CREATIVE (NJ-creative.hu)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                            child: const Text('NJ-CREATIVE', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                          const SizedBox(width: 20),
+                          const Text('|', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                          const SizedBox(width: 20),
+                           TextButton.icon(
+                            icon: const Icon(Icons.warning_amber, color: Colors.redAccent, size: 14),
+                            label: const Text('Fiók törlése', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                            onPressed: () => _showDeleteAccountDialog(context, ref),
+                             style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              alignment: Alignment.center
+                            ),
                           ),
                         ],
                       ),
@@ -381,6 +395,116 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
             ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showInfoDialog(BuildContext context, {required String title, required String content, required IconData icon, required Color color}) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: color),
+          ),
+          title: Row(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 10),
+              Text(title, style: const TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: Text(content, style: const TextStyle(color: Colors.white70)),
+          actions: <Widget>[
+            TextButton(
+              child: Text('OK', style: TextStyle(color: color)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showDeleteAccountDialog(BuildContext context, WidgetRef ref) async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // User must tap a button to dismiss
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Colors.redAccent),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text('Fiók törlése', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: const SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text(
+                  'Biztosan törölni szeretné a fiókját?',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Ez a művelet nem vonható vissza. Minden adata véglegesen törlődik.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Mégse', style: TextStyle(color: Colors.white70)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.delete_forever, size: 18),
+              label: const Text('Törlés'),
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                final authService = ref.read(authServiceProvider);
+                try {
+                  Navigator.of(dialogContext).pop();
+                  await authService.deleteAccount();
+                  if (mounted) {
+                    _showInfoDialog(context,
+                        title: 'Sikeres törlés',
+                        content: 'A fiók és a hozzá tartozó adatok sikeresen törölve lettek.',
+                        icon: Icons.check_circle,
+                        color: Colors.green);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                     _showInfoDialog(context,
+                        title: 'Hiba a törlés során',
+                        content: 'Hiba történt a fiók törlése közben. Kérjük, próbálja újra később. Hiba: ${e.toString()}',
+                        icon: Icons.error,
+                        color: Colors.red);
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -19,6 +19,21 @@ class AuthService {
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  Future<void> deleteAccount() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Fontos: A törlés előtt a Firebase megkövetelheti, hogy a felhasználó nemrég jelentkezzen be.
+        // Ha a törlés emiatt hibára fut, a `catch` blokk kezeli a további teendőket (pl. újra-authentikáció kérése).
+        await user.delete();
+      }
+    } catch (e) {
+      // Kezeld a hibákat, például ha újra be kell jelentkezni.
+      print('Hiba a fiók törlése közben: $e');
+      rethrow;
+    }
+  }
+
   // Visszaállítva a megbízhatóbb, webes felugró ablakos módra
   Future<void> signInWithGoogleWeb() async {
     final GoogleAuthProvider googleProvider = GoogleAuthProvider();

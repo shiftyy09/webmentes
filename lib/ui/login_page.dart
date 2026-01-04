@@ -26,7 +26,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
-  // ÚJ: Hibaüzenet fordító
   String _getErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
@@ -63,16 +62,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         await authService.signInWithEmail(_emailController.text, _passwordController.text);
       } else {
         await authService.signUpWithEmail(_emailController.text, _passwordController.text);
-        setState(() => _isLogin = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sikeres regisztráció! Kérlek, erősítsd meg az e-mail címedet a kiküldött levélben.'),
-            backgroundColor: Colors.green,
-          ),
+        _showInfoDialog(
+          'Sikeres regisztráció',
+          'Egy megerősítő linket küldtünk az e-mail címedre. Kérjük, kattints rá a bejelentkezés előtt!',
+          Icons.check_circle,
+          Colors.green,
         );
+        setState(() => _isLogin = true);
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _errorText = _getErrorMessage(e)); // Itt használjuk a fordítót
+      setState(() => _errorText = _getErrorMessage(e));
     } catch (e) {
       setState(() => _errorText = 'Ismeretlen hiba történt.');
     } finally {
@@ -80,11 +79,118 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     }
   }
 
+  Future<void> _showInfoDialog(String title, String content, IconData icon, Color color) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: color),
+        ),
+        title: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 10),
+            Text(title, style: const TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Text(content, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            child: Text('OK', style: TextStyle(color: color)),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _launchURL(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri)) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hiba a link megnyitásakor')));
+      if (mounted) _showInfoDialog('Hiba', 'A link megnyitása sikertelen.', Icons.error, Colors.red);
     }
+  }
+
+  Future<void> _showPasswordResetDialog() async {
+    final resetEmailController = TextEditingController();
+    return showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Colors.orange),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.help_outline, color: Colors.orange),
+                  SizedBox(width: 10),
+                  Text('Elfelejtett jelszó', style: TextStyle(color: Colors.white)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                      'Add meg az e-mail címedet, és küldünk egy linket a jelszó visszaállításához.', 
+                      style: TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: resetEmailController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'E-mail cím',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      prefixIcon: const Icon(Icons.email),
+                      filled: true,
+                      fillColor: Colors.grey[900],
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Mégse', style: TextStyle(color: Colors.white70)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.send, size: 18),
+                  label: const Text('Link küldése'),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final authService = ref.read(authServiceProvider);
+                    try {
+                      await authService.sendPasswordResetEmail(resetEmailController.text);
+                      Navigator.of(context).pop();
+                      _showInfoDialog(
+                        'Link elküldve',
+                        'A jelszó-visszaállító linket elküldtük az e-mail címedre!',
+                        Icons.check_circle,
+                        Colors.green,
+                      );
+                    } catch (e) {
+                      Navigator.of(context).pop();
+                       _showInfoDialog(
+                        'Hiba',
+                        (e as FirebaseAuthException).message ?? 'Ismeretlen hiba.',
+                        Icons.error,
+                        Colors.red,
+                      );
+                    }
+                  },
+                ),
+              ]);
+        });
   }
 
   @override
@@ -159,9 +265,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           obscureText: true,
                         ),
 
+                        if (_isLogin)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _showPasswordResetDialog,
+                              child: const Text('Elfelejtett jelszó?'),
+                            ),
+                          ),
+
                         if (_errorText != null)
                           Padding(
-                            padding: const EdgeInsets.only(top: 16.0),
+                            padding: const EdgeInsets.only(top: 8.0),
                             child: Text(_errorText!, style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                           ),
 
