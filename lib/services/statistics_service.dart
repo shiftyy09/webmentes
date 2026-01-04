@@ -28,54 +28,74 @@ class StatisticsService {
     double monthlyCost = 0;
     double monthlyLiters = 0;
     int monthlyDistance = 0;
-    double consumableLiters = 0;
+    double avgConsumption = 0;
 
-    for (int i = 0; i < allServices.length; i++) {
-      final service = allServices[i];
-      if (!service.description.toLowerCase().contains('tankolás')) continue;
+    final monthlyServices = allServices.where((s) => s.date.year == selectedMonth.year && s.date.month == selectedMonth.month).toList();
+    final fuelingEventsInMonth = monthlyServices.where((s) => s.description.toLowerCase().contains('tankolás')).toList();
 
-      double currentLiters = 0;
-      try {
-        final parts = service.description.split('(');
-        if (parts.length > 1) {
-          final literPart = parts[1].split(' ')[0].replaceAll(',', '.');
-          currentLiters = double.tryParse(literPart) ?? 0;
-        }
-      } catch (e) { /* ignore */ }
-
-      if (service.date.year == selectedMonth.year && service.date.month == selectedMonth.month) {
+    // 1. Havi költség és összes liter
+    for (final service in fuelingEventsInMonth) {
         monthlyCost += service.cost;
-        monthlyLiters += currentLiters;
-
-        Szerviz? prevService;
-        for (int j = i - 1; j >= 0; j--) {
-          if (allServices[j].description.toLowerCase().contains('tankolás')) {
-            prevService = allServices[j];
-            break;
+        try {
+          final parts = service.description.split('(');
+          if (parts.length > 1) {
+            final literPart = parts[1].split(' ')[0].replaceAll(',', '.');
+            monthlyLiters += double.tryParse(literPart) ?? 0;
           }
-        }
+        } catch (e) { /* ignore */ }
+    }
 
-        if (prevService != null) {
-          int dist = service.mileage - prevService.mileage;
-          if (dist > 0) {
-            monthlyDistance += dist;
-            double prevLiters = 0;
-             try {
-              final parts = prevService.description.split('(');
-              if (parts.length > 1) {
-                final literPart = parts[1].split(' ')[0].replaceAll(',', '.');
-                prevLiters = double.tryParse(literPart) ?? 0;
-              }
-            } catch (e) { /* ignore */ }
-            consumableLiters += prevLiters;
+    // 2. Havi megtett táv
+    if (fuelingEventsInMonth.length >= 2) {
+        monthlyDistance = fuelingEventsInMonth.last.mileage - fuelingEventsInMonth.first.mileage;
+    }
+
+    // 3. Pontos átlagfogyasztás számítása (HELYES LOGIKA)
+    final fullTankEvents = allServices
+        .where((s) => s.description.toLowerCase().contains('tankolás') && s.description.toLowerCase().contains('tele'))
+        .toList();
+
+    if (fullTankEvents.length >= 2) {
+      double totalLitersForConsumption = 0;
+      int totalDistanceForConsumption = 0;
+
+      for (int i = 0; i < fullTankEvents.length - 1; i++) {
+        final startTank = fullTankEvents[i];
+        final endTank = fullTankEvents[i+1];
+
+        if (endTank.date.year == selectedMonth.year && endTank.date.month == selectedMonth.month) {
+          final distance = endTank.mileage - startTank.mileage;
+          if (distance <= 0) continue;
+
+          double litersInPeriod = 0;
+          final startIndexInAll = allServices.indexOf(startTank);
+          final endIndexInAll = allServices.indexOf(endTank);
+
+          for (int j = startIndexInAll + 1; j <= endIndexInAll; j++) {
+            final s = allServices[j];
+            if (s.description.toLowerCase().contains('tankolás')) {
+               try {
+                final parts = s.description.split('(');
+                if (parts.length > 1) {
+                  final literPart = parts[1].split(' ')[0].replaceAll(',', '.');
+                  litersInPeriod += double.tryParse(literPart) ?? 0;
+                }
+              } catch (e) { /* ignore */ }
+            }
           }
+          
+          totalLitersForConsumption += litersInPeriod;
+          totalDistanceForConsumption += distance;
         }
+      }
+      
+      if(totalDistanceForConsumption > 0 && totalLitersForConsumption > 0) {
+        avgConsumption = (totalLitersForConsumption / totalDistanceForConsumption) * 100;
       }
     }
 
     final double avgPrice = monthlyLiters > 0 ? monthlyCost / monthlyLiters : 0;
-    final double avgConsumption = monthlyDistance > 0 ? (consumableLiters / monthlyDistance) * 100 : 0;
-    final double avgCostPerKm = monthlyDistance > 0 ? (consumableLiters * avgPrice) / monthlyDistance : 0;
+    final double avgCostPerKm = monthlyDistance > 0 && avgPrice > 0 && monthlyLiters > 0 ? (monthlyLiters * avgPrice) / monthlyDistance : 0;
 
     return MonthlyStats(
       totalCost: monthlyCost,
@@ -86,6 +106,7 @@ class StatisticsService {
       avgPrice: avgPrice,
     );
   }
+
 
   // --- ÚJ / MÓDOSÍTOTT FUNKCIÓK ---
 

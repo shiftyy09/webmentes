@@ -11,72 +11,73 @@ class TransferCostCalculatorPage extends StatefulWidget {
 }
 
 class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage> {
+  final _formKey = GlobalKey<FormState>();
   final _yearController = TextEditingController();
-  final _kwController = TextEditingController();
+  final _powerController = TextEditingController();
   final _cm3Controller = TextEditingController();
-  
+
+  final String _jarmuTipusa = 'szemelygepkocsi'; // Fixen csak személygépkocsi
+  String _szerzesMod = 'adasvetel';
+  bool _eredetvizsgaSzukseges = true;
+  bool _isKw = true;
+
   int? _eredetvizsga;
   int? _illetek;
   final int _forgalmi = 6000;
   final int _torzskonyv = 6000;
   int? _total;
 
-  void _calculate() {
-    final year = int.tryParse(_yearController.text);
-    final kw = int.tryParse(_kwController.text);
-    final cm3 = int.tryParse(_cm3Controller.text);
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _powerController.dispose();
+    _cm3Controller.dispose();
+    super.dispose();
+  }
 
-    if (year == null || kw == null || cm3 == null) {
+  void _calculate() {
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kérlek tölts ki minden mezőt helyesen!')),
+        const SnackBar(content: Text('Kérlek tölts ki minden kötelező mezőt!'), backgroundColor: Colors.redAccent),
       );
       return;
     }
 
-    // Eredetvizsga
-    int eredetAr = 0;
-    if (cm3 <= 1400) {
-      eredetAr = 17000;
-    } else if (cm3 <= 2000) {
-      eredetAr = 18500;
-    } else {
-      eredetAr = 20000;
-    }
+    final year = int.parse(_yearController.text);
+    final power = int.tryParse(_powerController.text) ?? 0;
+    final cm3 = int.tryParse(_cm3Controller.text) ?? 0;
+    final isDoubled = _szerzesMod != 'adasvetel';
 
-    // Vagyonszerzési illeték
+    // 1. EREDETIVIZSGA (a leírásod alapján)
+    int eredetvizsgaDij = 0;
+    if (_eredetvizsgaSzukseges) {
+        if (cm3 <= 1400) eredetvizsgaDij = 22950;
+        else if (cm3 <= 2000) eredetvizsgaDij = 24975;
+        else eredetvizsgaDij = 27000;
+    }
+    
+    // 2. VAGYONSZERZÉSI ILLETÉK (a leírásod alapján)
+    final int kw = _isKw ? power : (power / 1.36).round();
     final currentYear = DateTime.now().year;
     final age = currentYear - year;
-    
+    int illetekAlap = 0;
+
     int rate = 0;
-
     if (age <= 3) {
-      if (kw <= 40) rate = 345;
-      else if (kw <= 80) rate = 450;
-      else if (kw <= 120) rate = 550;
-      else rate = 850;
-    } else if (age <= 8) {
-      if (kw <= 40) rate = 300;
-      else if (kw <= 80) rate = 395;
-      else if (kw <= 120) rate = 450;
-      else rate = 650;
-    } else if (age <= 12) {
-       if (kw <= 40) rate = 230;
-      else if (kw <= 80) rate = 300;
-      else if (kw <= 120) rate = 300;
-      else rate = 460;
-    } else {
-      if (kw <= 40) rate = 185;
-      else if (kw <= 80) rate = 230;
-      else if (kw <= 120) rate = 230;
-      else rate = 345;
+      if (kw <= 40) rate = 550; else if (kw <= 80) rate = 650; else if (kw <= 120) rate = 750; else rate = 850;
+    } else if (age >= 4 && age <= 8) {
+      if (kw <= 40) rate = 450; else if (kw <= 80) rate = 550; else if (kw <= 120) rate = 650; else rate = 750;
+    } else { // 8 év felett
+      if (kw <= 40) rate = 300; else if (kw <= 80) rate = 450; else if (kw <= 120) rate = 550; else rate = 650;
     }
-
-    final illetekAr = kw * rate;
+    illetekAlap = kw * rate;
+    
+    final illetekAr = isDoubled ? illetekAlap * 2 : illetekAlap;
 
     setState(() {
-      _eredetvizsga = eredetAr;
+      _eredetvizsga = eredetvizsgaDij;
       _illetek = illetekAr;
-      _total = eredetAr + illetekAr + _forgalmi + _torzskonyv;
+      _total = eredetvizsgaDij + illetekAr + _forgalmi + _torzskonyv;
     });
   }
 
@@ -86,93 +87,84 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Átírási Költség Kalkulátor'),
-      ),
+      appBar: AppBar(), // CÍM ELTÁVOLÍTVA
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 600),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // INPUT KÁRTYA
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Jármű Adatai',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 24),
-                        _buildInputField(controller: _yearController, label: 'Gyártási év', icon: Icons.calendar_today, suffix: 'év'),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(child: _buildInputField(controller: _kwController, label: 'Teljesítmény', icon: Icons.bolt, suffix: 'kW')),
-                            const SizedBox(width: 16),
-                            // JAVÍTVA: Icons.settings használata Icons.engine helyett
-                            Expanded(child: _buildInputField(controller: _cm3Controller, label: 'Lökettérfogat', icon: Icons.settings, suffix: 'cm³')),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton.icon(
-                            onPressed: _calculate,
-                            icon: const Icon(Icons.calculate),
-                            label: const Text('SZÁMOLÁS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-
-                // EREDMÉNY KÁRTYA
-                if (_total != null)
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Card(
-                    color: const Color(0xFF1E1E1E), // Sötét kártya az eredménynek
-                    elevation: 8,
+                    elevation: 4,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Összesen fizetendő', style: TextStyle(color: Colors.white70, fontSize: 16)),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${numberFormat.format(_total)} Ft',
-                            style: TextStyle(color: theme.colorScheme.primary, fontSize: 36, fontWeight: FontWeight.bold),
+                          // JAVÍTVA: Chip helyett teljes szélességű Container
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.directions_car, color: Colors.grey[700]),
+                                const SizedBox(width: 8),
+                                const Text('Személygépkocsi Átírás Kalkulátor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              ],
+                            ),
                           ),
-                          const Divider(color: Colors.white24, height: 40),
-                          _buildResultRow('Eredetvizsga', _eredetvizsga!),
-                          _buildResultRow('Vagyonszerzési illeték', _illetek!),
-                          _buildResultRow('Új forgalmi engedély', _forgalmi),
-                          _buildResultRow('Törzskönyv', _torzskonyv),
-                          const Divider(color: Colors.white24, height: 40),
-                          const Text('Eloszlás helyileg:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 12),
-                          _buildResultRow('Eredetvizsgánál fizetendő', _eredetvizsga!, color: Colors.orangeAccent),
-                          _buildResultRow('Kormányablakban fizetendő', _illetek! + _forgalmi + _torzskonyv, color: Colors.blueAccent),
+                          const SizedBox(height: 24),
+                          _buildInputField(controller: _yearController, label: 'Gyártási év', icon: Icons.calendar_today, isRequired: true),
+                          const SizedBox(height: 16),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _buildInputField(controller: _powerController, label: 'Teljesítmény', icon: Icons.bolt, suffix: _isKw ? 'kW' : 'LE', isRequired: true)),
+                              const SizedBox(width: 8),
+                              Padding(padding: const EdgeInsets.only(top: 8.0), child: ToggleButtons(isSelected: [_isKw, !_isKw], onPressed: (i) => setState(() => _isKw = i == 0), borderRadius: BorderRadius.circular(8), children: const [Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('kW')), Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('LE'))])),
+                            ],
+                          ),
+                           const SizedBox(height: 16),
+                          _buildInputField(controller: _cm3Controller, label: 'Lökettérfogat', icon: Icons.settings, suffix: 'cm³', isRequired: true),
+                          const SizedBox(height: 16),
+                           _buildDropdownField('Szerzés módja', _szerzesMod, {'adasvetel': 'Adásvétel', 'orokles': 'Öröklés', 'ajandekazas': 'Ajándékozás'}, (v) => setState(()=> _szerzesMod=v!)),
+                           const Text('Öröklés és ajándékozás esetén az illeték dupla!', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                           const SizedBox(height: 16),
+                          CheckboxListTile(
+                            title: const Text('Eredetvizsgálat szükséges'),
+                            value: _eredetvizsgaSzukseges,
+                            onChanged: (val) => setState(() => _eredetvizsgaSzukseges = val!),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity, height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: _calculate,
+                              icon: const Icon(Icons.calculate),
+                              label: const Text('SZÁMOLÁS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE69500), foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
-              ],
+                  const SizedBox(height: 24),
+                  if (_total != null) _buildResultsCard(numberFormat, theme),
+                ],
+              ),
             ),
           ),
         ),
@@ -180,12 +172,38 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
     );
   }
 
-  Widget _buildInputField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required String suffix,
-  }) {
+  Widget _buildResultsCard(NumberFormat numberFormat, ThemeData theme) {
+    return Card(
+      color: const Color(0xFF1E1E1E), elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            const Text('Összesen fizetendő', style: TextStyle(color: Colors.white70, fontSize: 16)),
+            const SizedBox(height: 8),
+            Text('${numberFormat.format(_total)} Ft', style: const TextStyle(color: Color(0xFFE69500), fontSize: 36, fontWeight: FontWeight.bold)),
+            const Divider(color: Colors.white24, height: 40),
+            _buildResultRow('Eredetvizsga', _eredetvizsga ?? 0),
+            _buildResultRow('Vagyonszerzési illeték', _illetek ?? 0),
+            _buildResultRow('Új forgalmi engedély', _forgalmi),
+            _buildResultRow('Törzskönyv', _torzskonyv),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField(String label, String currentValue, Map<String, String> items, ValueChanged<String?> onChanged) {
+    return DropdownButtonFormField<String>(
+      value: currentValue,
+      items: items.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+      onChanged: onChanged,
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+    );
+  }
+
+  Widget _buildInputField({required TextEditingController controller, required String label, required IconData icon, String? suffix, bool isRequired = false}) {
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.number,
@@ -195,9 +213,12 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
         prefixIcon: Icon(icon, color: Colors.grey),
         suffixText: suffix,
         filled: true,
-        // fillColor: Colors.white, // Opcionális, ha a háttér nem fehér
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       ),
+      validator: (value) {
+        if (isRequired && (value == null || value.isEmpty)) return 'Kötelező mező';
+        return null;
+      },
     );
   }
 
@@ -209,10 +230,7 @@ class _TransferCostCalculatorPageState extends State<TransferCostCalculatorPage>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 15)),
-          Text(
-            '${numberFormat.format(value)} Ft',
-            style: TextStyle(color: color ?? Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          Text('${numberFormat.format(value)} Ft', style: TextStyle(color: color ?? Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );
