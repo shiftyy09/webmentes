@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
+import 'package:olajfolt_web/alap/konstansok.dart'; // Importáltuk a konstansokat
 
 // --- AUTHENTICATION ---
 
@@ -23,18 +24,14 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        // Fontos: A törlés előtt a Firebase megkövetelheti, hogy a felhasználó nemrég jelentkezzen be.
-        // Ha a törlés emiatt hibára fut, a `catch` blokk kezeli a további teendőket (pl. újra-authentikáció kérése).
         await user.delete();
       }
     } catch (e) {
-      // Kezeld a hibákat, például ha újra be kell jelentkezni.
       print('Hiba a fiók törlése közben: $e');
       rethrow;
     }
   }
 
-  // Visszaállítva a megbízhatóbb, webes felugró ablakos módra
   Future<void> signInWithGoogleWeb() async {
     final GoogleAuthProvider googleProvider = GoogleAuthProvider();
     await _auth.signInWithPopup(googleProvider);
@@ -69,7 +66,6 @@ class AuthService {
 
 final firestoreServiceProvider = Provider<FirestoreService>((ref) => FirestoreService());
 
-// A bejelentkezett felhasználó járműveinek stream-je
 final vehiclesProvider = StreamProvider<List<Jarmu>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user != null) {
@@ -78,16 +74,18 @@ final vehiclesProvider = StreamProvider<List<Jarmu>>((ref) {
   return Stream.value([]);
 });
 
-// Az aktuálisan kiválasztott jármű ID-jának állapota
 final selectedVehicleIdProvider = StateProvider<String?>((ref) => null);
 
-// A kiválasztott járműhöz tartozó szervizek stream-je
+// MÓDOSÍTOTT SZERVIZ PROVIDER
 final servicesForSelectedVehicleProvider = StreamProvider<List<Szerviz>>((ref) {
   final user = ref.watch(authStateProvider).value;
   final selectedVehicleId = ref.watch(selectedVehicleIdProvider);
 
   if (user != null && selectedVehicleId != null) {
-    return ref.watch(firestoreServiceProvider).watchServices(user.uid, selectedVehicleId);
+    return ref.watch(firestoreServiceProvider).watchServices(user.uid, selectedVehicleId).map((services) {
+      // Itt szűrjük ki a technikai bejegyzéseket a listából
+      return services.where((service) => !service.description.startsWith(REMINDER_PREFIX)).toList();
+    });
   }
   return Stream.value([]);
 });
