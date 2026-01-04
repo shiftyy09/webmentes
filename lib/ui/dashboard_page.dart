@@ -115,7 +115,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
     return Scaffold(
       body: Stack(
         children: [
+          // KÉP HOZZÁADÁSA A JOBB ALSÓ SAROKBA
+          Positioned(
+            bottom: 70, // Még feljebb hozva
+            right: 0,
+            child: Opacity(
+              opacity: 1.0, // Teljesen látható
+              child: Image.asset(
+                'assets/hatterweb.png',
+                width: 500, // Kicsit kisebb
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+
           Scaffold(
+            backgroundColor: Colors.transparent, // Hogy a háttérkép átlátszódjon
             appBar: AppBar(
               backgroundColor: const Color(0xFF1E1E1E),
               foregroundColor: Colors.white,
