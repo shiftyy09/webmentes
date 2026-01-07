@@ -153,7 +153,8 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
       final user = ref.read(authStateProvider).value;
       if (user == null || widget.vehicle.id == null) return;
       final firestoreService = ref.read(firestoreServiceProvider);
-      final vehicleNumericId = int.tryParse(widget.vehicle.id!) ?? 0;
+      // Végleges javítás: Minden szervizhez 0-t használunk a vehicleId mezőben.
+      const vehicleNumericId = 0; 
 
       // 1. Intervallumok mentése (Jármű frissítése)
       final Map<String, int> newIntervals = Map.from(widget.vehicle.customIntervals ?? {});

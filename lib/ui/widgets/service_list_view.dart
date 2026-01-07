@@ -18,7 +18,8 @@ class ServiceListView extends ConsumerWidget {
     final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authStateProvider).value;
     final selectedVehicleId = ref.read(selectedVehicleIdProvider);
-    final vehicleNumericId = int.tryParse(vehicle?.id ?? '') ?? 0;
+    // Végleges javítás: Minden szervizhez 0-t használunk a vehicleId mezőben.
+    const vehicleNumericId = 0; 
 
     if (user == null || selectedVehicleId == null) return;
 
@@ -39,7 +40,8 @@ class ServiceListView extends ConsumerWidget {
     final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authStateProvider).value;
     final selectedVehicleId = ref.read(selectedVehicleIdProvider);
-    final vehicleNumericId = int.tryParse(vehicle?.id ?? '') ?? 0;
+    // Végleges javítás: Minden szervizhez 0-t használunk a vehicleId mezőben.
+    const vehicleNumericId = 0; 
 
     if (user == null || selectedVehicleId == null) return;
 

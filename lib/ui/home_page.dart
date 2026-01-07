@@ -34,8 +34,12 @@ class HomePage extends ConsumerWidget {
       final vehicleNumericId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
 
       if (initialServices.isNotEmpty) {
+        // A mobil app szinkronizációja alapján az inicializáló szervizekhez
+        // a vehicleId-nek 0-nak kell lennie.
+        const vehicleNumericIdForInitialService = 0;
+        
         for (var service in initialServices) {
-          await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericId, service);
+          await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericIdForInitialService, service);
         }
       }
     }
