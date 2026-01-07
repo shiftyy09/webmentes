@@ -21,9 +21,6 @@ const Map<String, Map<String, dynamic>> SERVICE_DEFINITIONS = {
   'Kuplung': {'intervalKm': 150000, 'intervalHonap': null},
   'Vezérlés (Szíj)': {'intervalKm': 120000, 'intervalHonap': null}, // Régebbi "Vezérlés csere"
   'Műszaki vizsga': {'intervalKm': null, 'intervalHonap': 24}, // 2 évente
-  'Kötelező biztosítás': {'intervalKm': null, 'intervalHonap': 12}, // Évente
-  'CASCO': {'intervalKm': null, 'intervalHonap': 12}, // Évente
-  'Pályamatrica': {'intervalKm': null, 'intervalHonap': 12}, // Évente
 };
 
 // Azon szerviztípusok listája, amelyeknél figyelembe vesszük a km-alapú emlékeztetőt
@@ -47,11 +44,8 @@ const List<String> DATE_BASED_SERVICE_TYPES = [
   'Olajcsere', // Az olajcsere dátum és km alapú is lehet
   'Fékfolyadék',
   'Hűtőfolyadék',
-  'Kötelező biztosítás',
-  'CASCO',
-  'Pályamatrica',
 ];
 
 // Az összes emlékeztető alapjául szolgáló szerviztípus
 final List<String> ALL_REMINDER_SERVICE_TYPES =
-    (KM_BASED_SERVICE_TYPES + DATE_BASED_SERVICE_TYPES).toSet().toList();
+(KM_BASED_SERVICE_TYPES + DATE_BASED_SERVICE_TYPES).toSet().toList();
