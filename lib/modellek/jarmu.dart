@@ -80,15 +80,20 @@ class Jarmu {
   }
 
   Map<String, dynamic> toFirestore() {
-    return {
+    final Map<String, dynamic> data = {
       'licensePlate': licensePlate,
       'make': make,
       'model': model,
       'year': year,
       'mileage': mileage,
-      'vin': vin,
+      'vin': vin == '' ? null : vin,
       'vezerlesTipusa': vezerlesTipusa,
-      if (customIntervals != null) 'customIntervals': customIntervals,
     };
+
+    if (customIntervals != null) {
+      data['customIntervals'] = customIntervals;
+    }
+
+    return data;
   }
 }

@@ -29,7 +29,7 @@ class _VehicleNotificationDetailsPageState extends ConsumerState<VehicleNotifica
   bool _isLoading = true;
 
   @override
-  void initState() {
+  initState() {
     super.initState();
     _settings = Map<String, dynamic>.from(widget.initialSettings);
     _loadLastServices();
@@ -64,6 +64,16 @@ class _VehicleNotificationDetailsPageState extends ConsumerState<VehicleNotifica
     final user = ref.read(authStateProvider).value;
 
     if (user != null && widget.vehicle.id != null) {
+      // JAVÍTVA: A vehicle.id tartalmazza a rendszámot. A numerikus ID-t itt 0-nak vesszük,
+      // mivel az upsertService-nek már nem a rendszám kell a vehicleId mezőbe.
+      // NOTE: A vehicle.id a rendszám, ami a document ID! A Jarmu modellben nincs külön numeric ID.
+      // Azonban a firestore_service.upsertService 4 paramétert vár.
+
+      // A vehicle.id a rendszám, ami a document ID. A Jarmu modellben nincs külön numeric ID.
+      // Azonban a firestore_service.upsertService 4 paramétert vár.
+      final vehicleNumericId = int.tryParse(widget.vehicle.id!) ?? 0;
+      final licensePlate = widget.vehicle.licensePlate;
+
       for (var type in ALL_REMINDER_SERVICE_TYPES) {
         final data = _lastServiceData[type];
         if (data != null && (data['date'] != null || (data['mileage'] != null && data['mileage'] > 0))) {
@@ -73,7 +83,8 @@ class _VehicleNotificationDetailsPageState extends ConsumerState<VehicleNotifica
             mileage: data['mileage'] ?? 0,
             cost: 0,
           );
-          await firestoreService.upsertService(user.uid, widget.vehicle.id!, newBaseService);
+          // 4 argumentumos hívás beillesztése
+          await firestoreService.upsertService(user.uid, licensePlate, vehicleNumericId, newBaseService);
         }
       }
     }

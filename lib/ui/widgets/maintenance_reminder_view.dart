@@ -153,6 +153,7 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
       final user = ref.read(authStateProvider).value;
       if (user == null || widget.vehicle.id == null) return;
       final firestoreService = ref.read(firestoreServiceProvider);
+      final vehicleNumericId = int.tryParse(widget.vehicle.id!) ?? 0;
 
       // 1. Intervallumok mentése (Jármű frissítése)
       final Map<String, int> newIntervals = Map.from(widget.vehicle.customIntervals ?? {});
@@ -180,7 +181,7 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
           mileage: newLastKm ?? lastService.mileage,
           date: newLastDate ?? lastService.date,
         );
-        await firestoreService.upsertService(user.uid, widget.vehicle.id!, updatedService);
+        await firestoreService.upsertService(user.uid, widget.vehicle.licensePlate, vehicleNumericId, updatedService);
       } else if (newLastDate != null || newLastKm != null) {
         // Új létrehozása ("Emlékeztető alap")
         final newService = Szerviz(
@@ -189,7 +190,7 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
           mileage: newLastKm ?? 0,
           cost: 0,
         );
-        await firestoreService.upsertService(user.uid, widget.vehicle.id!, newService);
+        await firestoreService.upsertService(user.uid, widget.vehicle.licensePlate, vehicleNumericId, newService);
       }
       
       if (mounted) SuccessOverlay.show(context: context, message: 'Adatok frissítve!');

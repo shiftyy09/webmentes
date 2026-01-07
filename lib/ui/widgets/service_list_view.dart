@@ -18,6 +18,7 @@ class ServiceListView extends ConsumerWidget {
     final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authStateProvider).value;
     final selectedVehicleId = ref.read(selectedVehicleIdProvider);
+    final vehicleNumericId = int.tryParse(vehicle?.id ?? '') ?? 0;
 
     if (user == null || selectedVehicleId == null) return;
 
@@ -27,7 +28,7 @@ class ServiceListView extends ConsumerWidget {
     );
 
     if (result != null) {
-      await firestoreService.upsertService(user.uid, selectedVehicleId, result);
+      await firestoreService.upsertService(user.uid, selectedVehicleId, vehicleNumericId, result);
       if (context.mounted) {
         SuccessOverlay.show(context: context, message: service == null ? 'Szerviz hozzáadva!' : 'Szerviz frissítve!');
       }
@@ -38,6 +39,7 @@ class ServiceListView extends ConsumerWidget {
     final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authStateProvider).value;
     final selectedVehicleId = ref.read(selectedVehicleIdProvider);
+    final vehicleNumericId = int.tryParse(vehicle?.id ?? '') ?? 0;
 
     if (user == null || selectedVehicleId == null) return;
 
@@ -58,7 +60,7 @@ class ServiceListView extends ConsumerWidget {
     );
 
     if (result != null) {
-      await firestoreService.upsertService(user.uid, selectedVehicleId, result);
+      await firestoreService.upsertService(user.uid, selectedVehicleId, vehicleNumericId, result);
       if (context.mounted) {
         SuccessOverlay.show(context: context, message: 'Tankolás rögzítve!');
       }

@@ -31,7 +31,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
   final Map<String, TextEditingController> _serviceDateControllers = {};
   final Map<String, TextEditingController> _serviceMileageControllers = {};
   
-  // ÚJ: Intervallum szerkesztők
   final Map<String, TextEditingController> _intervalKmControllers = {};
   final Map<String, TextEditingController> _intervalMonthControllers = {};
 
@@ -57,12 +56,10 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
     _vinController = TextEditingController(text: widget.vehicle?.vin ?? '');
     _selectedVezerlesTipus = widget.vehicle?.vezerlesTipusa;
 
-    // Inicializálás
     for (var serviceType in ALL_REMINDER_SERVICE_TYPES) {
       _serviceDateControllers[serviceType] = TextEditingController();
       _serviceMileageControllers[serviceType] = TextEditingController();
       
-      // Intervallumok betöltése (ha van egyedi, azt, ha nincs, az alapértelmezettet)
       final defaults = SERVICE_DEFINITIONS[serviceType] ?? {};
       final custom = widget.vehicle?.customIntervals ?? {};
       
@@ -73,11 +70,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
       
       if (DATE_BASED_SERVICE_TYPES.contains(serviceType)) {
         final val = custom['${serviceType}_month'] ?? defaults['intervalHonap'];
-        // Megjelenítés években, ha osztható 12-vel, de tárolás hónapban
-        // Egyszerűsítés: Most hónapban írjuk ki/be, vagy évben? A mobilapp kódban hónap van.
-        // Maradjunk a hónapnál az egyszerűség kedvéért, vagy konvertáljunk.
-        // A mobil kódban: "Intervallum (év)" címke van, de months-ban tárol.
-        // Itt most hónapban jelenítem meg, hogy pontos legyen.
         _intervalMonthControllers[serviceType] = TextEditingController(text: val?.toString() ?? '');
       }
     }
@@ -100,7 +92,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
 
   void _onSave() {
     if (_formKey.currentState?.validate() ?? false) {
-      // Intervallumok összegyűjtése
       final Map<String, int> customIntervals = {};
       
       _intervalKmControllers.forEach((type, controller) {
@@ -126,6 +117,8 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
       );
 
       final List<Szerviz> initialServices = [];
+
+      // Minden kitöltött emlékeztető mezőt szervizbejegyzésként adunk hozzá
       _serviceDateControllers.forEach((serviceType, dateController) {
         if (dateController.text.isNotEmpty) {
           final mileageController = _serviceMileageControllers[serviceType]!;
@@ -143,6 +136,18 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
           ));
         }
       });
+
+      // Ha egyetlen szerviz dátumot sem adtak meg, de van kezdő km, 
+      // rögzítünk egy alap állapotot, hogy ne legyen üres a napló.
+      if (!_isEditing && initialServices.isEmpty && vehicle.mileage > 0) {
+          initialServices.add(Szerviz(
+            description: 'Jármű felvétele (Kezdeti állapot)',
+            date: DateTime.now(),
+            mileage: vehicle.mileage,
+            cost: 0,
+          ));
+      }
+      
       Navigator.of(context).pop({'vehicle': vehicle, 'services': initialServices});
     }
   }
@@ -175,7 +180,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: theme.scaffoldBackgroundColor,
       child: SizedBox(
-        width: 800, // Szélesebb a több oszlop miatt
+        width: 800,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -184,9 +189,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))
-                ],
               ),
               child: Row(
                 children: [
@@ -206,7 +208,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                 ],
               ),
             ),
-
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -214,7 +215,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      // ALAPADATOK
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -232,8 +232,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                 Expanded(child: _buildModernField(controller: _licensePlateController, label: 'Rendszám', icon: Icons.badge, isRequired: true)),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: LayoutBuilder(
-                                    builder: (context, constraints) => Autocomplete<String>(
+                                  child: Autocomplete<String>(
                                       initialValue: TextEditingValue(text: _makeController.text),
                                       optionsBuilder: (TextEditingValue textEditingValue) {
                                         if (textEditingValue.text == '') return const Iterable<String>.empty();
@@ -264,7 +263,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                         );
                                       },
                                     ),
-                                  ),
                                 ),
                               ],
                             ),
@@ -294,10 +292,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                           ],
                         ),
                       ),
-                      
                       const SizedBox(height: 24),
-
-                      // RÉSZLETES BEÁLLÍTÁSOK (KEZDETI ADATOK + INTERVALLUMOK)
                       Theme(
                         data: theme.copyWith(dividerColor: Colors.transparent),
                         child: Container(
@@ -327,7 +322,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                     Row(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Dátum
                                         Expanded(
                                           flex: 2,
                                           child: _buildModernField(
@@ -340,7 +334,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        // Km állás (ha van)
                                         if (showKm && !isVignette) ...[
                                           Expanded(
                                             flex: 2,
@@ -355,8 +348,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                           ),
                                           const SizedBox(width: 8),
                                         ],
-                                        
-                                        // Intervallumok (ha nem matrica)
                                         if (!isVignette) ...[
                                           if (showKm) ...[
                                             Expanded(
@@ -386,7 +377,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                                             ),
                                           ]
                                         ],
-                                        
                                         if (isVignette)
                                           Expanded(
                                             flex: 2,
@@ -413,7 +403,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                 ),
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.all(24),
               child: Row(
@@ -421,7 +410,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                   Expanded(
                     child: TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                       child: const Text('Mégse'),
                     ),
                   ),
@@ -434,10 +422,9 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                         backgroundColor: theme.colorScheme.primary,
                         foregroundColor: theme.colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 4,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('MENTÉS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      child: const Text('MENTÉS', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -457,8 +444,6 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
         fillColor: Colors.grey.withOpacity(0.05),
         contentPadding: isSmall ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8) : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withOpacity(0.3))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withOpacity(0.3))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.orange, width: 2)),
     );
   }
 

@@ -31,11 +31,11 @@ class HomePage extends ConsumerWidget {
       final Jarmu vehicleToSave = result['vehicle'];
       final List<Szerviz> initialServices = result['services'];
       
-      final vehicleId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
+      final vehicleNumericId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
 
-      if (vehicleId != null && initialServices.isNotEmpty) {
+      if (initialServices.isNotEmpty) {
         for (var service in initialServices) {
-          await firestoreService.upsertService(user.uid, vehicleId, service);
+          await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericId, service);
         }
       }
     }

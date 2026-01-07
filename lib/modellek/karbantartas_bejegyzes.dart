@@ -62,7 +62,7 @@ class Szerviz {
   Map<String, dynamic> toFirestore() {
     return {
       'description': description,
-      'date': Timestamp.fromDate(date),
+      'date': date.toIso8601String(),
       'cost': cost,
       'mileage': mileage,
     };

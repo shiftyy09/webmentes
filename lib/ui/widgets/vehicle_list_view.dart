@@ -27,25 +27,19 @@ class VehicleListView extends ConsumerWidget {
       final Jarmu vehicleToSave = result['vehicle'];
       final List<Szerviz> initialServices = result['services'];
       
-      final vehicleId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
+      final vehicleNumericId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
 
-      if (vehicleId != null) {
-        if (initialServices.isNotEmpty) {
-          for (var service in initialServices) {
-            await firestoreService.upsertService(user.uid, vehicleId, service);
-          }
+      if (initialServices.isNotEmpty) {
+        for (var service in initialServices) {
+          await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericId, service);
         }
-        
-        // 1. SIKERES ANIMÁCIÓ
-        if (context.mounted) {
-           SuccessOverlay.show(context: context, message: 'Jármű sikeresen hozzáadva!');
-        }
-
-        // 2. AUTOMATIKUS KIVÁLASZTÁS
-        // Kis késleltetés, hogy az adatbázis frissüljön és az animáció elinduljon
-        await Future.delayed(const Duration(milliseconds: 300));
-        ref.read(selectedVehicleIdProvider.notifier).state = vehicleId;
       }
+      
+      if (context.mounted) {
+         SuccessOverlay.show(context: context, message: 'Jármű sikeresen hozzáadva!');
+      }
+
+      ref.read(selectedVehicleIdProvider.notifier).state = vehicleToSave.licensePlate;
     }
   }
 
@@ -67,7 +61,6 @@ class VehicleListView extends ConsumerWidget {
             width: double.infinity,
             height: 50,
             child: ElevatedButton.icon(
-              // Most már a helyi metódust hívjuk, ami kezeli a mentést és animációt
               onPressed: () => _addNewVehicle(context, ref),
               icon: const Icon(Icons.add, color: Colors.white),
               label: const Text('ÚJ JÁRMŰ FELVÉTELE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

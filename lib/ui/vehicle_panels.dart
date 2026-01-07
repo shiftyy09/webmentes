@@ -1,5 +1,6 @@
 // lib/ui/vehicle_panels.dart
-import 'package:flutter/material.dart'; // EZ A SOR HIÁNYZOTT
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -324,6 +325,7 @@ class _ServiceLogSection extends ConsumerWidget {
     final user = ref.watch(authStateProvider).value!;
     final fs = ref.watch(firestoreServiceProvider);
     final servicesAsync = ref.watch(servicesForSelectedVehicleProvider);
+    final vehicleNumericId = int.tryParse(vehicle.id ?? '') ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +340,7 @@ class _ServiceLogSection extends ConsumerWidget {
               onPressed: () async {
                 final result = await showDialog<Szerviz>(context: context, builder: (context) => const ServiceDialog());
                 if (result != null) {
-                  await fs.upsertService(user.uid, vehicle.id!, result);
+                  await fs.upsertService(user.uid, vehicle.licensePlate, vehicleNumericId, result);
                 }
               },
             ),
@@ -378,7 +380,7 @@ class _ServiceLogSection extends ConsumerWidget {
                           icon: const Icon(Icons.edit, size: 20, color: Colors.white70),
                           onPressed: () async {
                             final result = await showDialog<Szerviz>(context: context, builder: (context) => ServiceDialog(initial: s));
-                            if (result != null) await fs.upsertService(user.uid, vehicle.id!, result);
+                            if (result != null) await fs.upsertService(user.uid, vehicle.licensePlate, vehicleNumericId, result);
                           },
                         ),
                         IconButton(
@@ -550,7 +552,13 @@ class _ServiceDialogState extends State<ServiceDialog> {
           onPressed: () {
             if (!_formKey.currentState!.validate()) return;
             if (_selectedDate == null) return;
-            final s = Szerviz(id: widget.initial?.id, description: _descCtrl.text.trim(), date: _selectedDate!, cost: num.parse(_costCtrl.text.trim()), mileage: int.parse(_mileageCtrl.text.trim()));
+            final s = Szerviz(
+              id: widget.initial?.id, 
+              description: _descCtrl.text.trim(), 
+              date: _selectedDate!, 
+              cost: num.parse(_costCtrl.text.trim()), 
+              mileage: int.parse(_mileageCtrl.text.trim()),
+            );
             Navigator.of(context).pop(s);
           },
         ),
