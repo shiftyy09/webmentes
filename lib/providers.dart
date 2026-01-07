@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
-import 'package:olajfolt_web/alap/konstansok.dart'; // Importáltuk a konstansokat
+// import 'package:olajfolt_web/alap/konstansok.dart'; // Ez a sor már nem feltétlenül kell ide
 
 // --- AUTHENTICATION ---
 
@@ -76,15 +76,17 @@ final vehiclesProvider = StreamProvider<List<Jarmu>>((ref) {
 
 final selectedVehicleIdProvider = StateProvider<String?>((ref) => null);
 
-// MÓDOSÍTOTT SZERVIZ PROVIDER
+// MÓDOSÍTOTT SZERVIZ PROVIDER - JAVÍTVA
 final servicesForSelectedVehicleProvider = StreamProvider<List<Szerviz>>((ref) {
   final user = ref.watch(authStateProvider).value;
   final selectedVehicleId = ref.watch(selectedVehicleIdProvider);
 
   if (user != null && selectedVehicleId != null) {
     return ref.watch(firestoreServiceProvider).watchServices(user.uid, selectedVehicleId).map((services) {
-      // Itt szűrjük ki a technikai bejegyzéseket a listából
-      return services.where((service) => !service.description.startsWith(REMINDER_PREFIX)).toList();
+      // JAVÍTÁS: Itt NEM szűrjük ki az adatokat!
+      // Minden adatot továbbadunk, hogy az Emlékeztető nézet (MaintenanceReminderView)
+      // megkapja az "Emlékeztető alap" bejegyzéseket is a számoláshoz.
+      return services;
     });
   }
   return Stream.value([]);

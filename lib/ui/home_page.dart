@@ -5,11 +5,12 @@ import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
 import 'package:olajfolt_web/ui/dialogs/vehicle_editor_dialog.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers.dart';
 import '../theme_provider.dart';
+
+// --- EZ AZ IMPORT HIÁNYZOTT NÁLAD ---
 import 'widgets/vehicle_list_view.dart';
 import 'widgets/vehicle_detail_panel.dart';
 
@@ -30,14 +31,14 @@ class HomePage extends ConsumerWidget {
     if (result != null) {
       final Jarmu vehicleToSave = result['vehicle'];
       final List<Szerviz> initialServices = result['services'];
-      
+
       final vehicleNumericId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
 
       if (initialServices.isNotEmpty) {
         // A mobil app szinkronizációja alapján az inicializáló szervizekhez
         // a vehicleId-nek 0-nak kell lennie.
         const vehicleNumericIdForInitialService = 0;
-        
+
         for (var service in initialServices) {
           await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericIdForInitialService, service);
         }
@@ -79,6 +80,7 @@ class HomePage extends ConsumerWidget {
           Expanded(
             child: Row(
               children: [
+                // ITT HASZNÁLJUK A VehicleListView-t
                 SizedBox(
                   width: 350,
                   child: VehicleListView(onAddVehicle: () => _openVehicleEditor(context, ref)),

@@ -1,1 +1,0 @@
-:  C:\\Users\\archi\\AndroidStudioProjects\\car_maintenance_app\\web_app\\web\\index.html

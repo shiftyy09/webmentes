@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/theme_provider.dart';
-import 'package:olajfolt_web/ui/home_page.dart';
+import 'package:olajfolt_web/ui/home_page.dart'; // FONTOS: Ez az import kell a hiba javításához!
 import 'package:olajfolt_web/ui/calculators/transfer_cost_page.dart';
 import 'package:olajfolt_web/ui/notification_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ÚJ IMPORT
-import 'package:intl/intl.dart'; // Dátumformázáshoz
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 
 class DashboardPage extends ConsumerStatefulWidget {
@@ -25,10 +24,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   late AnimationController _fadeController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
-  
+
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   Timer? _safetyTimer;
   bool _isOnline = true;
   StreamSubscription? _connectivitySubscription;
@@ -37,7 +36,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   @override
   void initState() {
     super.initState();
-    
+
     Connectivity().checkConnectivity().then((results) {
       _updateConnectionStatus(results);
     });
@@ -45,10 +44,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       _updateConnectionStatus(results);
     });
-    
+
     _iconController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
     _scaleAnimation = CurvedAnimation(parent: _iconController, curve: Curves.elasticOut);
-    
+
     _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _fadeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(_fadeController);
 
@@ -88,10 +87,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   Future<void> _manualRefresh() async {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
-    
+
     ref.refresh(vehiclesProvider);
     await Future.delayed(const Duration(milliseconds: 1000));
-    
+
     if (mounted) setState(() => _isRefreshing = false);
   }
 
@@ -120,10 +119,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
             bottom: 75,
             right: 0,
             child: Opacity(
-              opacity: 1.0, 
+              opacity: 1.0,
               child: Image.asset(
                 'assets/hatterweb.png',
-                width: 500, 
+                width: 500,
                 fit: BoxFit.contain,
               ),
             ),
@@ -182,7 +181,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                           style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
                         ),
                         const SizedBox(height: 50),
-                        
+
                         Wrap(
                           spacing: 40,
                           runSpacing: 40,
@@ -218,7 +217,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                     ),
                   ),
                 ),
-                
+
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -240,14 +239,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                           const SizedBox(width: 20),
                           const Text('|', style: TextStyle(color: Colors.white54, fontSize: 12)),
                           const SizedBox(width: 20),
-                           TextButton.icon(
+                          TextButton.icon(
                             icon: const Icon(Icons.warning_amber, color: Colors.redAccent, size: 14),
                             label: const Text('Fiók törlése', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                             onPressed: () => _showDeleteAccountDialog(context, ref),
-                             style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              alignment: Alignment.center
+                            style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                alignment: Alignment.center
                             ),
                           ),
                         ],
@@ -282,7 +281,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white24),
                           ),
-                          child: _isRefreshing 
+                          child: _isRefreshing
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                               : const Icon(Icons.refresh, color: Colors.white, size: 20),
                         ),
@@ -305,7 +304,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                       } else if (snapshot.hasData && snapshot.data!.exists) {
                         final data = snapshot.data!.data() as Map<String, dynamic>?;
                         final lastSync = data?['lastAppSync'] as Timestamp?;
-                        
+
                         if (lastSync != null) {
                           final diff = DateTime.now().difference(lastSync.toDate());
                           if (diff.inMinutes < 15) {
@@ -493,7 +492,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                   }
                 } catch (e) {
                   if (mounted) {
-                     _showInfoDialog(context,
+                    _showInfoDialog(context,
                         title: 'Hiba a törlés során',
                         content: 'Hiba történt a fiók törlése közben. Kérjük, próbálja újra később. Hiba: ${e.toString()}',
                         icon: Icons.error,
@@ -514,7 +513,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF00C853), Color(0xFF1B5E20)], 
+          colors: [Color(0xFF00C853), Color(0xFF1B5E20)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

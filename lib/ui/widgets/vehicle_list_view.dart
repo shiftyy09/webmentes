@@ -5,7 +5,11 @@ import 'package:olajfolt_web/modellek/jarmu.dart';
 import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/ui/dialogs/vehicle_editor_dialog.dart';
-import 'package:olajfolt_web/ui/widgets/success_overlay.dart'; // ÚJ IMPORT
+import 'package:olajfolt_web/ui/widgets/success_overlay.dart';
+import 'package:olajfolt_web/alap/konstansok.dart';
+import 'package:olajfolt_web/ui/widgets/service_list_item.dart';
+import 'package:olajfolt_web/ui/dialogs/service_editor_dialog.dart';
+import 'package:olajfolt_web/ui/dialogs/fueling_dialog.dart';
 
 class VehicleListView extends ConsumerWidget {
   final VoidCallback onAddVehicle;
@@ -26,20 +30,21 @@ class VehicleListView extends ConsumerWidget {
     if (result != null) {
       final Jarmu vehicleToSave = result['vehicle'];
       final List<Szerviz> initialServices = result['services'];
-      
+
       final vehicleNumericId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
 
       if (initialServices.isNotEmpty) {
+        const vehicleNumericIdForServices = 0;
         for (var service in initialServices) {
-          await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericId, service);
+          await firestoreService.upsertService(user.uid, vehicleToSave.licensePlate, vehicleNumericIdForServices, service);
         }
       }
-      
+
       if (context.mounted) {
-         SuccessOverlay.show(context: context, message: 'Jármű sikeresen hozzáadva!');
+        SuccessOverlay.show(context: context, message: 'Jármű sikeresen hozzáadva!');
       }
 
-      ref.read(selectedVehicleIdProvider.notifier).state = vehicleToSave.licensePlate;
+      ref.read(selectedVehicleIdProvider.notifier).state = vehicleToSave.id;
     }
   }
 
@@ -85,14 +90,14 @@ class VehicleListView extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final vehicle = vehicles[index];
                   final isSelected = vehicle.id == selectedVehicleId;
-                  
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () {
-                           ref.read(selectedVehicleIdProvider.notifier).state = vehicle.id;
+                          ref.read(selectedVehicleIdProvider.notifier).state = vehicle.id;
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
@@ -105,8 +110,8 @@ class VehicleListView extends ConsumerWidget {
                               color: isSelected ? theme.colorScheme.primary : Colors.transparent,
                               width: 2,
                             ),
-                            boxShadow: isSelected 
-                                ? [] 
+                            boxShadow: isSelected
+                                ? []
                                 : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
                           ),
                           child: Row(
