@@ -6,10 +6,6 @@ import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/ui/dialogs/vehicle_editor_dialog.dart';
 import 'package:olajfolt_web/ui/widgets/success_overlay.dart';
-import 'package:olajfolt_web/alap/konstansok.dart';
-import 'package:olajfolt_web/ui/widgets/service_list_item.dart';
-import 'package:olajfolt_web/ui/dialogs/service_editor_dialog.dart';
-import 'package:olajfolt_web/ui/dialogs/fueling_dialog.dart';
 
 class VehicleListView extends ConsumerWidget {
   final VoidCallback onAddVehicle;

@@ -84,19 +84,27 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
     );
   }
 
-  // --- 1. ÁTTEKINTÉS FÜL ---
+  // --- 1. ÁTTEKINTÉS FÜL (MÓDOSÍTVA: KÉT KÜLÖN KÁRTYA) ---
   Widget _buildOverviewTab(BuildContext context, List<Szerviz> services) {
     final statsService = StatisticsService();
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
     final dateFormat = DateFormat('yyyy. MM. dd.');
 
     final lastOilChange = statsService.findLastServiceByDescription(services, 'olajcsere');
-    final totalCost = statsService.calculateTotalCost(services);
+
+    // ITT A LÉNYEG: Külön hívjuk meg a két függvényt
+    final totalServiceCost = statsService.calculateTotalServiceCost(services);
+    final totalFuelCost = statsService.calculateTotalFuelCost(services);
+
     final lastInspection = statsService.findLastServiceByDescription(services, 'műszaki vizsga');
 
     final stats = [
       _StatCard(icon: Icons.oil_barrel, title: 'Utolsó olajcsere', value: lastOilChange != null ? dateFormat.format(lastOilChange.date) : 'Nincs adat', subtitle: lastOilChange != null ? '${numberFormat.format(lastOilChange.mileage)} km' : '', color: Colors.black87),
-      _StatCard(icon: Icons.paid, title: 'Összes szervizköltség', value: '${numberFormat.format(totalCost)} Ft', subtitle: '${services.length} bejegyzés alapján', color: Colors.green),
+
+      // EZEK AZ ÚJ KÁRTYÁK
+      _StatCard(icon: Icons.build, title: 'Szervizköltség', value: '${numberFormat.format(totalServiceCost)} Ft', subtitle: 'Karbantartás, javítás', color: Colors.green),
+      _StatCard(icon: Icons.local_gas_station, title: 'Üzemanyagköltség', value: '${numberFormat.format(totalFuelCost)} Ft', subtitle: 'Összes tankolás', color: Colors.orange),
+
       _StatCard(icon: Icons.verified, title: 'Műszaki érvényes', value: lastInspection != null ? dateFormat.format(DateTime(lastInspection.date.year + 2, lastInspection.date.month, lastInspection.date.day)) : 'Nincs adat', subtitle: 'A legutóbbi vizsga alapján', color: Colors.blue),
     ];
 
@@ -138,41 +146,41 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
           child: (currentStats.totalCost == 0 && currentStats.totalDistance == 0)
               ? const Center(child: Text('A kiválasztott hónapban nincsenek adatok.'))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          _buildTrendCard(title: 'Összes Költség', value: '${numberFormat.format(currentStats.totalCost)} Ft', prevValue: prevStats.totalCost, currentValue: currentStats.totalCost, inverse: true, icon: Icons.account_balance_wallet, color: Colors.green),
-                          _buildTrendCard(title: 'Átlagfogyasztás', value: '${currentStats.avgConsumption.toStringAsFixed(1)} L', prevValue: prevStats.avgConsumption, currentValue: currentStats.avgConsumption, inverse: true, icon: Icons.local_gas_station, color: Colors.orange, unit: '/100km'),
-                          _buildTrendCard(title: 'Megtett Táv', value: '${numberFormat.format(currentStats.totalDistance)} km', prevValue: prevStats.totalDistance.toDouble(), currentValue: currentStats.totalDistance.toDouble(), inverse: false, icon: Icons.map, color: Colors.blue),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const Text('RÉSZLETES ELEMZÉS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24.0),
-                          child: Column(
-                            children: [
-                              _StatRow(icon: Icons.water_drop, label: 'Összes tankolt mennyiség', value: '${currentStats.totalLiters.toStringAsFixed(1)} liter', color: Colors.teal),
-                              const Divider(),
-                              _StatRow(icon: Icons.price_change, label: 'Átlagos üzemanyagár', value: '${numberFormat.format(currentStats.avgPrice)} Ft/L', color: Colors.amber[800]!),
-                              const Divider(),
-                              _StatRow(icon: Icons.calendar_today, label: 'Napi átlagos költség', value: '${numberFormat.format(dailyCost.toInt())} Ft / nap', color: Colors.redAccent),
-                              const Divider(),
-                              _StatRow(icon: Icons.speed, label: 'Napi átlagos futás', value: '${dailyKm.toStringAsFixed(1)} km / nap', color: Colors.indigo),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: [
+                    _buildTrendCard(title: 'Havi Üzemanyag', value: '${numberFormat.format(currentStats.totalCost)} Ft', prevValue: prevStats.totalCost, currentValue: currentStats.totalCost, inverse: true, icon: Icons.account_balance_wallet, color: Colors.green),
+                    _buildTrendCard(title: 'Átlagfogyasztás', value: '${currentStats.avgConsumption.toStringAsFixed(1)} L', prevValue: prevStats.avgConsumption, currentValue: currentStats.avgConsumption, inverse: true, icon: Icons.local_gas_station, color: Colors.orange, unit: '/100km'),
+                    _buildTrendCard(title: 'Megtett Táv', value: '${numberFormat.format(currentStats.totalDistance)} km', prevValue: prevStats.totalDistance.toDouble(), currentValue: currentStats.totalDistance.toDouble(), inverse: false, icon: Icons.map, color: Colors.blue),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text('RÉSZLETES ELEMZÉS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      children: [
+                        _StatRow(icon: Icons.water_drop, label: 'Összes tankolt mennyiség', value: '${currentStats.totalLiters.toStringAsFixed(1)} liter', color: Colors.teal),
+                        const Divider(),
+                        _StatRow(icon: Icons.price_change, label: 'Átlagos üzemanyagár', value: '${numberFormat.format(currentStats.avgPrice)} Ft/L', color: Colors.amber[800]!),
+                        const Divider(),
+                        _StatRow(icon: Icons.calendar_today, label: 'Napi átlagos költség', value: '${numberFormat.format(dailyCost.toInt())} Ft / nap', color: Colors.redAccent),
+                        const Divider(),
+                        _StatRow(icon: Icons.speed, label: 'Napi átlagos futás', value: '${dailyKm.toStringAsFixed(1)} km / nap', color: Colors.indigo),
+                      ],
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -182,12 +190,12 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
   Widget _buildFinanceTab(BuildContext context, List<Szerviz> services) {
     final statsService = StatisticsService();
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
-    
+
     final yearlyComparison = statsService.getYearlyComparison(services);
+
     final topExpenses = statsService.getTopExpenses(services);
     final fixedCosts = statsService.getFixedCostsBreakdown(services);
-    
-    // ÚJ: Szerviz statisztikák
+
     final serviceStats = statsService.getServiceStats(services);
     final serviceCountLastYear = serviceStats['countLastYear'] as int;
     final avgKmInterval = serviceStats['avgKmInterval'] as int;
@@ -197,7 +205,16 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTrendCard(title: 'Idei Kiadások', value: '${numberFormat.format(yearlyComparison['thisYear'])} Ft', prevValue: yearlyComparison['lastYear']!, currentValue: yearlyComparison['thisYear']!, inverse: true, icon: Icons.calendar_today, color: Colors.blueGrey, unit: ' vs Tavaly (${numberFormat.format(yearlyComparison['lastYear'])})'),
+          _buildTrendCard(
+              title: 'Idei Szervizköltség',
+              value: '${numberFormat.format(yearlyComparison['thisYear'])} Ft',
+              prevValue: yearlyComparison['lastYear']!,
+              currentValue: yearlyComparison['thisYear']!,
+              inverse: true,
+              icon: Icons.build,
+              color: Colors.blueGrey,
+              unit: ' vs Tavaly (csak szerviz)'
+          ),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -210,7 +227,6 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
                         const Text('Szervizlátogatások (elmúlt 1 év)', style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         Text('$serviceCountLastYear alkalom', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red)),
-                        // Ha van elég adat az átlaghoz, megjelenítjük
                         if (avgKmInterval > 0)
                           Text('Átlagosan ${numberFormat.format(avgKmInterval)} km-enként', style: const TextStyle(fontSize: 12, color: Colors.grey))
                         else
@@ -239,7 +255,7 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
             ],
           ),
           const SizedBox(height: 24),
-          const Text('TOP 5 LEGDRÁGÁBB TÉTEL', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
+          const Text('TOP 5 LEGDRÁGÁBB SZERVIZ', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
           const SizedBox(height: 16),
           Card(
             child: Column(

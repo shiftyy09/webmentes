@@ -10,7 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers.dart';
 import '../theme_provider.dart';
 
-// --- EZ AZ IMPORT HIÁNYZOTT NÁLAD ---
+// --- ENNEK A SORNAK MUSZÁJ ITT LENNIE ---
 import 'widgets/vehicle_list_view.dart';
 import 'widgets/vehicle_detail_panel.dart';
 
@@ -35,8 +35,6 @@ class HomePage extends ConsumerWidget {
       final vehicleNumericId = await firestoreService.upsertVehicle(user.uid, vehicleToSave);
 
       if (initialServices.isNotEmpty) {
-        // A mobil app szinkronizációja alapján az inicializáló szervizekhez
-        // a vehicleId-nek 0-nak kell lennie.
         const vehicleNumericIdForInitialService = 0;
 
         for (var service in initialServices) {
@@ -55,7 +53,6 @@ class HomePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Járműveim'),
-        // A vissza gombot a Flutter automatikusan kezeli, ha push-olva lett az oldal
         actions: [
           IconButton(
             icon: Icon(themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode),
@@ -80,9 +77,9 @@ class HomePage extends ConsumerWidget {
           Expanded(
             child: Row(
               children: [
-                // ITT HASZNÁLJUK A VehicleListView-t
                 SizedBox(
                   width: 350,
+                  // Ez a Widget most már elérhető, mert importáltuk
                   child: VehicleListView(onAddVehicle: () => _openVehicleEditor(context, ref)),
                 ),
                 const VerticalDivider(width: 1),
