@@ -30,19 +30,13 @@ class FirestoreService {
 
   Future<int> upsertVehicle(String userId, Jarmu jarmu) async {
     final vehicleId = _generateVehicleId(jarmu.licensePlate);
+    final Map<String, dynamic> data = jarmu.toFirestore();
     
-    final Map<String, dynamic> data = {
-      'licensePlate': jarmu.licensePlate,
-      'make': jarmu.make,
-      'model': jarmu.model,
-      'year': jarmu.year,
-      'mileage': jarmu.mileage,
-      'vin': jarmu.vin == '' ? null : jarmu.vin,
-      'vezerlesTipusa': jarmu.vezerlesTipusa,
-      'lastUpdated': FieldValue.serverTimestamp(),
-      'customIntervals': {},
-      'imagePath': null,
-    };
+    data['lastUpdated'] = FieldValue.serverTimestamp();
+    
+    if (jarmu.customIntervals == null) {
+      data['customIntervals'] = {};
+    }
 
     int newId;
     if (jarmu.id == null) {
@@ -51,8 +45,10 @@ class FirestoreService {
       data['id'] = newId;
     } else {
       newId = int.tryParse(jarmu.id!) ?? 0;
+      data['id'] = newId;
     }
 
+    // merge: true -> Megmarad a mobil app által mentett imagePath!
     await _vehiclesRef(userId).doc(vehicleId).set(data, SetOptions(merge: true));
     return newId;
   }
@@ -79,12 +75,15 @@ class FirestoreService {
 
   Future<void> upsertService(String userId, String licensePlate, int vehicleNumericId, Szerviz szerviz) async {
     final vehicleId = _generateVehicleId(licensePlate);
+    
+    // A Szerviz.toFirestore() már Timestamp-et ad vissza!
     final data = szerviz.toFirestore();
 
     data['lastUpdated'] = FieldValue.serverTimestamp();
     data['cost'] = szerviz.cost;
     data['vehicleId'] = vehicleNumericId;
-    data['date'] = szerviz.date.toIso8601String();
+    
+    // FONTOS: Nem írjuk felül String-el, hagyjuk meg a Timestamp-et a szinkron miatt!
 
     if (szerviz.id != null) {
       await _servicesRef(userId, vehicleId).doc(szerviz.id).set(data, SetOptions(merge: true));
