@@ -8,6 +8,7 @@ class Jarmu {
   final int mileage;
   final String? vin;
   final String? vezerlesTipusa;
+  final String? radioCode; // ÚJ MEZŐ
   // ÚJ: Egyedi intervallumok a webes szinkronhoz
   final Map<String, int>? customIntervals;
 
@@ -20,6 +21,7 @@ class Jarmu {
     required this.mileage,
     this.vin,
     this.vezerlesTipusa,
+    this.radioCode,
     this.customIntervals,
   });
 
@@ -32,6 +34,7 @@ class Jarmu {
     int? mileage,
     String? vin,
     String? vezerlesTipusa,
+    String? radioCode,
     Map<String, int>? customIntervals,
   }) {
     return Jarmu(
@@ -43,6 +46,7 @@ class Jarmu {
       mileage: mileage ?? this.mileage,
       vin: vin ?? this.vin,
       vezerlesTipusa: vezerlesTipusa ?? this.vezerlesTipusa,
+      radioCode: radioCode ?? this.radioCode,
       customIntervals: customIntervals ?? this.customIntervals,
     );
   }
@@ -57,6 +61,7 @@ class Jarmu {
       mileage: 0,
       vin: null,
       vezerlesTipusa: null,
+      radioCode: null,
     );
   }
 
@@ -73,6 +78,7 @@ class Jarmu {
       mileage: (data['mileage'] as num?)?.toInt() ?? 0,
       vin: data['vin'] as String?,
       vezerlesTipusa: data['vezerlesTipusa'] as String?,
+      radioCode: data['radioCode'] as String?,
       customIntervals: data['customIntervals'] != null 
           ? Map<String, int>.from(data['customIntervals']) 
           : null,
@@ -88,6 +94,7 @@ class Jarmu {
       'mileage': mileage,
       'vin': vin == '' ? null : vin,
       'vezerlesTipusa': vezerlesTipusa,
+      'radioCode': radioCode,
     };
 
     if (customIntervals != null) {

@@ -87,6 +87,15 @@ class VehicleDataView extends StatelessWidget {
                               (vehicle.vezerlesTipusa != null && vehicle.vezerlesTipusa!.isNotEmpty) ? vehicle.vezerlesTipusa! : '-', 
                               Colors.teal
                             ),
+
+                            // ÚJ SOR: Rádió kód
+                            _buildDataRow(
+                              context, 
+                              Icons.radio, 
+                              'Rádió kód', 
+                              (vehicle.radioCode != null && vehicle.radioCode!.isNotEmpty) ? vehicle.radioCode! : '-', 
+                              Colors.redAccent
+                            ),
                           ],
                         ),
                       ),

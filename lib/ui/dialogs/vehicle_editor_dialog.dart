@@ -25,6 +25,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
   late final TextEditingController _mileageController;
   late final TextEditingController _vinController;
   late final TextEditingController _makeController;
+  late final TextEditingController _radioCodeController; // ÚJ
   
   String? _selectedVezerlesTipus;
 
@@ -54,6 +55,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
     _yearController = TextEditingController(text: widget.vehicle?.year.toString() ?? '');
     _mileageController = TextEditingController(text: widget.vehicle?.mileage.toString() ?? '');
     _vinController = TextEditingController(text: widget.vehicle?.vin ?? '');
+    _radioCodeController = TextEditingController(text: widget.vehicle?.radioCode ?? ''); // ÚJ
     _selectedVezerlesTipus = widget.vehicle?.vezerlesTipusa;
 
     for (var serviceType in ALL_REMINDER_SERVICE_TYPES) {
@@ -83,6 +85,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
     _yearController.dispose();
     _mileageController.dispose();
     _vinController.dispose();
+    _radioCodeController.dispose(); // ÚJ
     _serviceDateControllers.forEach((_, controller) => controller.dispose());
     _serviceMileageControllers.forEach((_, controller) => controller.dispose());
     _intervalKmControllers.forEach((_, c) => c.dispose());
@@ -113,6 +116,7 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
         mileage: int.tryParse(_mileageController.text) ?? 0,
         vin: _vinController.text,
         vezerlesTipusa: _selectedVezerlesTipus,
+        radioCode: _radioCodeController.text.isEmpty ? null : _radioCodeController.text, // ÚJ
         customIntervals: customIntervals.isNotEmpty ? customIntervals : null,
       );
 
@@ -283,11 +287,19 @@ class _VehicleEditorDialogState extends State<VehicleEditorDialog> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            DropdownButtonFormField<String>(
-                              value: _selectedVezerlesTipus,
-                              items: vezerlesTipusok.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
-                              onChanged: (value) => setState(() => _selectedVezerlesTipus = value),
-                              decoration: _buildInputDecoration(label: 'Vezérlés típusa', icon: Icons.settings),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _selectedVezerlesTipus,
+                                    items: vezerlesTipusok.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                                    onChanged: (value) => setState(() => _selectedVezerlesTipus = value),
+                                    decoration: _buildInputDecoration(label: 'Vezérlés típusa', icon: Icons.settings),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(child: _buildModernField(controller: _radioCodeController, label: 'Rádió kód', icon: Icons.radio, isRequired: false)), // ÚJ
+                              ],
                             ),
                           ],
                         ),

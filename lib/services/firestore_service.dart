@@ -40,15 +40,14 @@ class FirestoreService {
 
     int newId;
     if (jarmu.id == null) {
-      final snapshot = await _vehiclesRef(userId).get();
-      newId = snapshot.docs.length + 1;
+      // Új jármű esetén is használjunk időbélyeget, hogy véletlenül se ütközzön semmivel
+      newId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       data['id'] = newId;
     } else {
       newId = int.tryParse(jarmu.id!) ?? 0;
       data['id'] = newId;
     }
 
-    // merge: true -> Megmarad a mobil app által mentett imagePath!
     await _vehiclesRef(userId).doc(vehicleId).set(data, SetOptions(merge: true));
     return newId;
   }
@@ -75,23 +74,20 @@ class FirestoreService {
 
   Future<void> upsertService(String userId, String licensePlate, int vehicleNumericId, Szerviz szerviz) async {
     final vehicleId = _generateVehicleId(licensePlate);
-    
-    // A Szerviz.toFirestore() már Timestamp-et ad vissza!
     final data = szerviz.toFirestore();
 
     data['lastUpdated'] = FieldValue.serverTimestamp();
     data['cost'] = szerviz.cost;
     data['vehicleId'] = vehicleNumericId;
     
-    // FONTOS: Nem írjuk felül String-el, hagyjuk meg a Timestamp-et a szinkron miatt!
-
-    if (szerviz.id != null) {
-      await _servicesRef(userId, vehicleId).doc(szerviz.id).set(data, SetOptions(merge: true));
+    if (szerviz.id != null && szerviz.id!.isNotEmpty) {
+      await _servicesRef(userId, vehicleId).doc(szerviz.id!).set(data, SetOptions(merge: true));
     } else {
-      final snapshot = await _servicesRef(userId, vehicleId).get();
-      final newId = (snapshot.docs.length + 1).toString();
-      data['id'] = int.parse(newId);
-      await _servicesRef(userId, vehicleId).doc(newId).set(data);
+      // JAVÍTVA: length+1 helyett egyedi időbélyeg ID
+      // Így Car A és Car B szervizei sosem fognak ütközni (nem lesz mindkettőnek "1"-es szervize)
+      final String uniqueId = DateTime.now().millisecondsSinceEpoch.toString();
+      data['id'] = int.parse(uniqueId.substring(uniqueId.length - 9)); // Biztonságos integer ID
+      await _servicesRef(userId, vehicleId).doc(uniqueId).set(data);
     }
   }
 
