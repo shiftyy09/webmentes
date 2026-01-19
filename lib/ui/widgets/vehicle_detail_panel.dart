@@ -1,7 +1,9 @@
 // lib/ui/widgets/vehicle_detail_panel.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:olajfolt_web/modellek/jarmu.dart';
+import 'package:olajfolt_web/modellek/karbantartas_bejegyzes.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/services/firestore_service.dart';
 import 'package:olajfolt_web/services/pdf_service.dart';
@@ -9,6 +11,7 @@ import 'package:olajfolt_web/ui/widgets/service_list_view.dart';
 import 'package:olajfolt_web/ui/widgets/vehicle_data_view.dart';
 import 'package:olajfolt_web/ui/widgets/vehicle_stats_view.dart';
 import 'package:olajfolt_web/ui/widgets/maintenance_reminder_view.dart';
+import 'package:olajfolt_web/alap/konstansok.dart';
 
 class VehicleDetailPanel extends ConsumerStatefulWidget {
   final Function(Jarmu) onEditVehicle;
@@ -72,10 +75,51 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
     }
   }
 
+  void _showArchiveDialog(BuildContext context, List<Szerviz> allServices) {
+    final reminders = allServices.where((s) => s.description.startsWith(REMINDER_PREFIX)).toList();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Row(
+          children: [
+            Icon(Icons.inventory_2_outlined, color: Colors.amber),
+            SizedBox(width: 12),
+            Text('Rendszer-archívum', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: reminders.isEmpty 
+            ? const Text('Nincsenek archivált rendszeradatok.', style: TextStyle(color: Colors.white54))
+            : ListView.separated(
+                shrinkWrap: true,
+                itemCount: reminders.length,
+                separatorBuilder: (_, __) => const Divider(color: Colors.white10),
+                itemBuilder: (context, index) {
+                  final r = reminders[index];
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.lock_outline, size: 16, color: Colors.white24),
+                    title: Text(r.description.replaceFirst(REMINDER_PREFIX, ''), style: const TextStyle(color: Colors.white70)),
+                    subtitle: Text('${DateFormat('yyyy.MM.dd').format(r.date)} • ${NumberFormat.decimalPattern('hu_HU').format(r.mileage)} km', style: const TextStyle(color: Colors.white24)),
+                  );
+                },
+              ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bezárás', style: TextStyle(color: Colors.amber))),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedVehicleId = ref.watch(selectedVehicleIdProvider);
     final vehiclesAsync = ref.watch(vehiclesProvider);
+    final servicesAsync = ref.watch(servicesForSelectedVehicleProvider);
 
     if (selectedVehicleId == null) {
       return const Center(child: Text('Válassz egy járművet a listából.'));
@@ -91,10 +135,7 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
         );
 
         if (vehicle.id == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(selectedVehicleIdProvider.notifier).state = null;
-          });
-          return const Center(child: Text('A jármű nem található. Lehet, hogy törölték.'));
+          return const Center(child: Text('A jármű nem található.'));
         }
 
         final theme = Theme.of(context);
@@ -114,22 +155,27 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
                         Text(
                           vehicle.licensePlate,
                           style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '${vehicle.make} ${vehicle.model} (${vehicle.year})',
                           style: theme.textTheme.titleMedium,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                   Row(
                     children: [
+                      // RAFAKÓS: Itt a doboz ikon a fejlécben!
+                      if (servicesAsync.hasValue)
+                        IconButton(
+                          icon: const Icon(Icons.inventory_2_outlined, color: Colors.amber),
+                          tooltip: 'Rendszer-archívum (Zárt adatok)',
+                          onPressed: () => _showArchiveDialog(context, servicesAsync.value!),
+                        ),
                       IconButton(
                         icon: const Icon(Icons.edit_outlined),
-                        tooltip: 'Jármű adatainak szerkesztése',
+                        tooltip: 'Jármű szerkesztése',
                         onPressed: () => widget.onEditVehicle(vehicle),
                       ),
                       IconButton(
@@ -146,27 +192,18 @@ class _VehicleDetailPanelState extends ConsumerState<VehicleDetailPanel>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Container(
-                height: 45, // Kicsit magasabb a kényelemért
+                height: 45,
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: TabBar(
                   controller: _tabController,
-                  // JAVÍTVA: A teljes tabot kitöltő indicator
                   indicatorSize: TabBarIndicatorSize.tab, 
                   indicator: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                     color: isDark ? Colors.grey[800] : Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      )
-                    ]
                   ),
-                  // JAVÍTVA: Kontrasztos fekete/fehér szöveg
                   labelColor: isDark ? Colors.white : Colors.black,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                   unselectedLabelColor: isDark ? Colors.grey[400] : Colors.grey[700],

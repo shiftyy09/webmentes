@@ -168,6 +168,7 @@ class _VehicleHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).value!;
     final fs = ref.watch(firestoreServiceProvider);
+    final servicesAsync = ref.watch(servicesForSelectedVehicleProvider);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,6 +188,21 @@ class _VehicleHeader extends ConsumerWidget {
           ],
         ),
         const Spacer(),
+        // RAFAKÓS MEGOLDÁS: Rendszer-archívum gomb a fejlécben
+        servicesAsync.when(
+          data: (services) {
+            final reminders = services.where((s) => s.description.startsWith(REMINDER_PREFIX)).toList();
+            if (reminders.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              tooltip: 'Rendszer-archívum & Szinkron adatok',
+              icon: const Icon(Icons.inventory_2_outlined, color: Colors.white24),
+              onPressed: () => _showSystemRecordsDialog(context, reminders),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+        const SizedBox(width: 8),
         TextButton.icon(
           icon: const Icon(Icons.edit, size: 16),
           label: const Text('Szerkesztés'),
@@ -222,6 +238,44 @@ class _VehicleHeader extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  void _showSystemRecordsDialog(BuildContext context, List<Szerviz> reminders) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.amber, size: 20),
+            SizedBox(width: 10),
+            Text('Rendszer-archívum', style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Ezek az adatok a mobil app emlékeztetőinek alapjai. Itt nem szerkeszthetők.', 
+                style: TextStyle(color: Colors.white38, fontSize: 12)),
+              const SizedBox(height: 16),
+              ...reminders.map((r) => ListTile(
+                dense: true,
+                title: Text(r.description.replaceFirst(REMINDER_PREFIX, ''), style: const TextStyle(color: Colors.white70)),
+                subtitle: Text('${DateFormat('yyyy.MM.dd').format(r.date)} • ${NumberFormat('#,###', 'hu_HU').format(r.mileage)} km', 
+                  style: const TextStyle(color: Colors.white24, fontSize: 11)),
+                trailing: const Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+              )).toList(),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bezárás', style: TextStyle(color: Colors.amber))),
+        ],
+      ),
     );
   }
 }
@@ -360,50 +414,28 @@ class _ServiceLogSection extends ConsumerWidget {
           ),
           child: servicesAsync.when(
             data: (services) {
-              if (services.isEmpty) {
+              final userServices = services.where((s) => !s.description.startsWith(REMINDER_PREFIX)).toList();
+
+              if (userServices.isEmpty) {
                 return const SizedBox(
                   height: 150,
                   child: Center(child: Text('Még nincs szervizbejegyzés ehhez a járműhöz.', style: TextStyle(color: Colors.white70))),
                 );
               }
               final dateFormat = DateFormat('yyyy.MM.dd');
+              
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: services.length,
+                itemCount: userServices.length,
                 separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF2a2a3a)),
                 itemBuilder: (context, index) {
-                  final s = services[index];
-                  final isReminder = s.description.startsWith(REMINDER_PREFIX);
-
+                  final s = userServices[index];
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            s.description, 
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isReminder ? Colors.white54 : Colors.white,
-                              fontStyle: isReminder ? FontStyle.italic : FontStyle.normal,
-                            )
-                          ),
-                        ),
-                        if (isReminder)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8.0),
-                            child: Icon(Icons.lock_outline, size: 16, color: Colors.amber),
-                          ),
-                      ],
-                    ),
+                    title: Text(s.description, style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('${dateFormat.format(s.date)} • ${NumberFormat('#,###', 'hu_HU').format(s.mileage)} km • ${NumberFormat.currency(locale: 'hu_HU', symbol: 'Ft', decimalDigits: 0).format(s.cost)}', style: const TextStyle(color: Colors.white70)),
-                    trailing: isReminder 
-                    ? const Tooltip(
-                        message: 'Rendszeradat (automatikus emlékeztető alap)',
-                        child: Icon(Icons.info_outline, size: 20, color: Colors.white24),
-                      )
-                    : Wrap(
+                    trailing: Wrap(
                       spacing: 0,
                       children: [
                         IconButton(

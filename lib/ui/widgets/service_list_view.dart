@@ -8,6 +8,7 @@ import 'package:olajfolt_web/ui/dialogs/service_editor_dialog.dart';
 import 'package:olajfolt_web/ui/dialogs/fueling_dialog.dart';
 import 'package:olajfolt_web/ui/widgets/service_list_item.dart';
 import 'package:olajfolt_web/ui/widgets/success_overlay.dart';
+import 'package:olajfolt_web/alap/konstansok.dart';
 
 class ServiceListView extends ConsumerWidget {
   final Jarmu? vehicle;
@@ -18,7 +19,6 @@ class ServiceListView extends ConsumerWidget {
     final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authStateProvider).value;
     final selectedVehicleId = ref.read(selectedVehicleIdProvider);
-    // Végleges javítás: Minden szervizhez 0-t használunk a vehicleId mezőben.
     const vehicleNumericId = 0; 
 
     if (user == null || selectedVehicleId == null) return;
@@ -40,7 +40,6 @@ class ServiceListView extends ConsumerWidget {
     final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authStateProvider).value;
     final selectedVehicleId = ref.read(selectedVehicleIdProvider);
-    // Végleges javítás: Minden szervizhez 0-t használunk a vehicleId mezőben.
     const vehicleNumericId = 0; 
 
     if (user == null || selectedVehicleId == null) return;
@@ -115,10 +114,9 @@ class ServiceListView extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TabBar(
-                      // JAVÍTVA: Teljes kitöltés
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: BoxDecoration(
-                        color: theme.colorScheme.primary, // Narancs (vagy ami a téma)
+                        color: theme.colorScheme.primary, 
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))
@@ -137,7 +135,6 @@ class ServiceListView extends ConsumerWidget {
                 ),
                 const SizedBox(width: 24),
                 
-                // JAVÍTVA: Hosszú szöveges gombok
                 Wrap(
                   spacing: 16,
                   children: [
@@ -175,7 +172,12 @@ class ServiceListView extends ConsumerWidget {
           Expanded(
             child: servicesAsync.when(
               data: (allServices) {
-                final services = allServices.where((s) => !s.description.toLowerCase().contains('tankolás')).toList();
+                // JAVÍTÁS: Kőkemény szűrés az emlékeztető alapokra!
+                final services = allServices.where((s) => 
+                  !s.description.toLowerCase().contains('tankolás') && 
+                  !s.description.startsWith(REMINDER_PREFIX)
+                ).toList();
+                
                 final refuelings = allServices.where((s) => s.description.toLowerCase().contains('tankolás')).toList();
 
                 return TabBarView(

@@ -84,27 +84,21 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
     );
   }
 
-  // --- 1. ÁTTEKINTÉS FÜL (MÓDOSÍTVA: KÉT KÜLÖN KÁRTYA) ---
+  // --- 1. ÁTTEKINTÉS FÜL ---
   Widget _buildOverviewTab(BuildContext context, List<Szerviz> services) {
     final statsService = StatisticsService();
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
     final dateFormat = DateFormat('yyyy. MM. dd.');
 
     final lastOilChange = statsService.findLastServiceByDescription(services, 'olajcsere');
-
-    // ITT A LÉNYEG: Külön hívjuk meg a két függvényt
     final totalServiceCost = statsService.calculateTotalServiceCost(services);
     final totalFuelCost = statsService.calculateTotalFuelCost(services);
-
     final lastInspection = statsService.findLastServiceByDescription(services, 'műszaki vizsga');
 
     final stats = [
       _StatCard(icon: Icons.oil_barrel, title: 'Utolsó olajcsere', value: lastOilChange != null ? dateFormat.format(lastOilChange.date) : 'Nincs adat', subtitle: lastOilChange != null ? '${numberFormat.format(lastOilChange.mileage)} km' : '', color: Colors.black87),
-
-      // EZEK AZ ÚJ KÁRTYÁK
       _StatCard(icon: Icons.build, title: 'Szervizköltség', value: '${numberFormat.format(totalServiceCost)} Ft', subtitle: 'Karbantartás, javítás', color: Colors.green),
       _StatCard(icon: Icons.local_gas_station, title: 'Üzemanyagköltség', value: '${numberFormat.format(totalFuelCost)} Ft', subtitle: 'Összes tankolás', color: Colors.orange),
-
       _StatCard(icon: Icons.verified, title: 'Műszaki érvényes', value: lastInspection != null ? dateFormat.format(DateTime(lastInspection.date.year + 2, lastInspection.date.month, lastInspection.date.day)) : 'Nincs adat', subtitle: 'A legutóbbi vizsga alapján', color: Colors.blue),
     ];
 
@@ -171,6 +165,9 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
                         const Divider(),
                         _StatRow(icon: Icons.price_change, label: 'Átlagos üzemanyagár', value: '${numberFormat.format(currentStats.avgPrice)} Ft/L', color: Colors.amber[800]!),
                         const Divider(),
+                        // ÚJ SOR: KÖLTSÉG / KM
+                        _StatRow(icon: Icons.currency_exchange, label: 'Átlagos kilométerköltség', value: '${currentStats.avgCostPerKm.toStringAsFixed(1)} Ft / km', color: Colors.blueGrey),
+                        const Divider(),
                         _StatRow(icon: Icons.calendar_today, label: 'Napi átlagos költség', value: '${numberFormat.format(dailyCost.toInt())} Ft / nap', color: Colors.redAccent),
                         const Divider(),
                         _StatRow(icon: Icons.speed, label: 'Napi átlagos futás', value: '${dailyKm.toStringAsFixed(1)} km / nap', color: Colors.indigo),
@@ -192,10 +189,8 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
 
     final yearlyComparison = statsService.getYearlyComparison(services);
-
     final topExpenses = statsService.getTopExpenses(services);
     final fixedCosts = statsService.getFixedCostsBreakdown(services);
-
     final serviceStats = statsService.getServiceStats(services);
     final serviceCountLastYear = serviceStats['countLastYear'] as int;
     final avgKmInterval = serviceStats['avgKmInterval'] as int;
