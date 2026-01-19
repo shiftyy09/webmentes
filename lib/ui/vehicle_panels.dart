@@ -8,6 +8,7 @@ import '../providers.dart';
 import '../modellek/jarmu.dart';
 import '../modellek/karbantartas_bejegyzes.dart';
 import '../services/firestore_service.dart';
+import '../alap/konstansok.dart';
 
 // --- BAL OLDALI JÁRMŰLISTA ---
 class VehicleListPanel extends ConsumerWidget {
@@ -239,13 +240,18 @@ class _StatisticsSection extends ConsumerWidget {
 
         double totalCost = 0;
         double fuelCost = 0;
+        int actualServiceCount = 0;
+
         for (final s in services) {
+          final isReminder = s.description.startsWith(REMINDER_PREFIX);
+          if (isReminder) continue;
+
           totalCost += s.cost;
+          actualServiceCount++;
           if (s.description.toLowerCase().contains('tankolás')) {
             fuelCost += s.cost;
           }
         }
-        final serviceCount = services.length;
 
         return Wrap(
           spacing: 24,
@@ -260,7 +266,7 @@ class _StatisticsSection extends ConsumerWidget {
             _StatCard(
               icon: Icons.build,
               label: 'Szervizek Száma',
-              value: '$serviceCount db',
+              value: '$actualServiceCount db',
               color: Colors.blue,
             ),
             _StatCard(
@@ -368,11 +374,36 @@ class _ServiceLogSection extends ConsumerWidget {
                 separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF2a2a3a)),
                 itemBuilder: (context, index) {
                   final s = services[index];
+                  final isReminder = s.description.startsWith(REMINDER_PREFIX);
+
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    title: Text(s.description, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            s.description, 
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: isReminder ? Colors.white54 : Colors.white,
+                              fontStyle: isReminder ? FontStyle.italic : FontStyle.normal,
+                            )
+                          ),
+                        ),
+                        if (isReminder)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8.0),
+                            child: Icon(Icons.lock_outline, size: 16, color: Colors.amber),
+                          ),
+                      ],
+                    ),
                     subtitle: Text('${dateFormat.format(s.date)} • ${NumberFormat('#,###', 'hu_HU').format(s.mileage)} km • ${NumberFormat.currency(locale: 'hu_HU', symbol: 'Ft', decimalDigits: 0).format(s.cost)}', style: const TextStyle(color: Colors.white70)),
-                    trailing: Wrap(
+                    trailing: isReminder 
+                    ? const Tooltip(
+                        message: 'Rendszeradat (automatikus emlékeztető alap)',
+                        child: Icon(Icons.info_outline, size: 20, color: Colors.white24),
+                      )
+                    : Wrap(
                       spacing: 0,
                       children: [
                         IconButton(
