@@ -72,7 +72,6 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
     }
   }
 
-  // JAVÍTVA: Teljeskörű szerkesztő (Utolsó szerviz + Intervallum)
   Future<void> _editReminderDetails(BuildContext context, String serviceType, Szerviz? lastService, int? currentIntervalKm, int? currentIntervalMonth) async {
     final lastKmController = TextEditingController(text: lastService?.mileage.toString() ?? '');
     final lastDateController = TextEditingController(text: lastService != null ? DateFormat('yyyy.MM.dd').format(lastService.date) : '');
@@ -153,10 +152,8 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
       final user = ref.read(authStateProvider).value;
       if (user == null || widget.vehicle.id == null) return;
       final firestoreService = ref.read(firestoreServiceProvider);
-      // Végleges javítás: Minden szervizhez 0-t használunk a vehicleId mezőben.
       const vehicleNumericId = 0; 
 
-      // 1. Intervallumok mentése (Jármű frissítése)
       final Map<String, int> newIntervals = Map.from(widget.vehicle.customIntervals ?? {});
       if (showKm) {
         final val = int.tryParse(intervalKmController.text);
@@ -170,21 +167,17 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
       final updatedVehicle = widget.vehicle.copyWith(customIntervals: newIntervals);
       await firestoreService.upsertVehicle(user.uid, updatedVehicle);
 
-      // 2. Utolsó szerviz adatának frissítése (Vagy létrehozása)
-      // Ha volt lastService, azt frissítjük. Ha nem volt, újat hozunk létre (de csak ha van kitöltött adat).
       int? newLastKm = int.tryParse(lastKmController.text);
       DateTime? newLastDate;
       try { newLastDate = DateFormat('yyyy.MM.dd').parse(lastDateController.text); } catch (_) {}
 
       if (lastService != null) {
-        // Meglévő frissítése
         final updatedService = lastService.copyWith(
           mileage: newLastKm ?? lastService.mileage,
           date: newLastDate ?? lastService.date,
         );
         await firestoreService.upsertService(user.uid, widget.vehicle.licensePlate, vehicleNumericId, updatedService);
       } else if (newLastDate != null || newLastKm != null) {
-        // Új létrehozása ("Emlékeztető alap")
         final newService = Szerviz(
           description: '$REMINDER_PREFIX$serviceType',
           date: newLastDate ?? DateTime.now(),
@@ -205,7 +198,6 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
 
     return Column(
       children: [
-        // KM ÓRA FRISSÍTŐ (Változatlan)
         Center(
           child: Container(
             width: 400,
@@ -289,11 +281,19 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
         else { statusColor = Colors.green; statusText = 'Rendben'; detailText = '${numberFormat.format(kmLeft)} km van hátra'; }
       } 
       else if (intervalMonths != null) {
-        final nextDate = lastService.date.add(Duration(days: intervalMonths * 30));
+        // JAVÍTVA: Pontos naptári hónap alapú számítás fix 30 nap helyett
+        final nextDate = DateTime(
+          lastService.date.year,
+          lastService.date.month + intervalMonths,
+          lastService.date.day,
+        );
+        
         final daysLeft = nextDate.difference(DateTime.now()).inDays;
-        final totalDays = intervalMonths * 30;
-        final daysPassed = totalDays - daysLeft;
-        progress = (daysPassed / totalDays).clamp(0.0, 1.0);
+        
+        // A haladási csíkhoz továbbra is kell egy közelítő érték napokban
+        final approxTotalDays = intervalMonths * 30.44; // Átlagos havi napok száma
+        final approxDaysPassed = approxTotalDays - daysLeft;
+        progress = (approxDaysPassed / approxTotalDays).clamp(0.0, 1.0);
 
         if (daysLeft <= 0) { statusColor = Colors.red; statusText = 'LEJÁRT!'; detailText = '${daysLeft.abs()} napja lejárt'; }
         else if (daysLeft < 30) { statusColor = Colors.orange; statusText = 'Hamarosan'; detailText = '$daysLeft nap van hátra'; }
@@ -306,7 +306,6 @@ class _MaintenanceReminderViewState extends ConsumerState<MaintenanceReminderVie
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: statusColor.withOpacity(0.3), width: 1)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        // JAVÍTVA: A teljes kártya kattintható a szerkesztéshez
         onTap: () => _editReminderDetails(context, type, lastService, intervalKm, intervalMonths),
         child: Padding(
           padding: const EdgeInsets.all(16.0),

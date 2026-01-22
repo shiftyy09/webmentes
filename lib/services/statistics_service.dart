@@ -28,7 +28,7 @@ class StatisticsService {
     return s.description.toLowerCase().contains('tankolás');
   }
 
-  // --- ÚJ: CSAK a szervizköltségek (tankolás nélkül) ---
+  // CSAK a szervizköltségek (tankolás és rendszeradatok nélkül)
   double calculateTotalServiceCost(List<Szerviz> services) {
     if (services.isEmpty) return 0;
     return services
@@ -36,7 +36,7 @@ class StatisticsService {
         .fold(0.0, (sum, s) => sum + s.cost);
   }
 
-  // --- ÚJ: CSAK az üzemanyagköltségek ---
+  // CSAK az üzemanyagköltségek
   double calculateTotalFuelCost(List<Szerviz> services) {
     if (services.isEmpty) return 0;
     return services
@@ -44,10 +44,28 @@ class StatisticsService {
         .fold(0.0, (sum, s) => sum + s.cost);
   }
 
-  // --- VISSZATETTÜK: Ez kell a PDF Service-nek! ---
+  // Teljes költség (mindent bele)
   double calculateTotalCost(List<Szerviz> services) {
     if (services.isEmpty) return 0;
-    return services.fold(0.0, (sum, s) => sum + s.cost);
+    return services
+        .where((s) => !s.description.startsWith('Emlékeztető alap: '))
+        .fold(0.0, (sum, s) => sum + s.cost);
+  }
+
+  // Költségmegoszlás (Százalékban)
+  Map<String, double> getCostDistribution(List<Szerviz> services) {
+    final total = calculateTotalCost(services);
+    if (total == 0) return {'fuel': 0, 'service': 0, 'fixed': 0};
+
+    final fuel = calculateTotalFuelCost(services);
+    final fixed = getFixedCostsBreakdown(services).values.fold(0.0, (a, b) => a + b);
+    final service = total - fuel - fixed;
+
+    return {
+      'fuel': fuel / total,
+      'service': service / total,
+      'fixed': fixed / total,
+    };
   }
 
   // Havi statisztikák (tankolás alapú)
@@ -62,7 +80,6 @@ class StatisticsService {
     final monthlyServices = allServices.where((s) => s.date.year == selectedMonth.year && s.date.month == selectedMonth.month).toList();
     final fuelingEventsInMonth = monthlyServices.where((s) => _isFuel(s)).toList();
 
-    // 1. Havi költség és összes liter
     for (final service in fuelingEventsInMonth) {
       monthlyCost += service.cost;
       try {
@@ -74,12 +91,10 @@ class StatisticsService {
       } catch (e) { /* ignore */ }
     }
 
-    // 2. Havi megtett táv
     if (fuelingEventsInMonth.length >= 2) {
       monthlyDistance = fuelingEventsInMonth.last.mileage - fuelingEventsInMonth.first.mileage;
     }
 
-    // 3. Pontos átlagfogyasztás számítása
     final fullTankEvents = allServices
         .where((s) => _isFuel(s) && s.description.toLowerCase().contains('tele'))
         .toList();
@@ -136,21 +151,18 @@ class StatisticsService {
     );
   }
 
-  // Top költségek (Tankolás NÉLKÜL)
   List<Szerviz> getTopExpenses(List<Szerviz> services) {
-    final sorted = services.where((s) => !_isFuel(s)).toList();
+    final sorted = services.where((s) => !_isFuel(s) && !s.description.startsWith('Emlékeztető alap: ')).toList();
     sorted.sort((a, b) => b.cost.compareTo(a.cost));
     return sorted.take(5).toList();
   }
 
-  // Éves összehasonlítás (CSAK SZERVIZ)
   Map<String, double> getYearlyComparison(List<Szerviz> services) {
     final now = DateTime.now();
     double thisYear = 0;
     double lastYear = 0;
 
-    // Kiszűrjük a tankolást
-    final maintenanceServices = services.where((s) => !_isFuel(s)).toList();
+    final maintenanceServices = services.where((s) => !_isFuel(s) && !s.description.startsWith('Emlékeztető alap: ')).toList();
 
     for (var s in maintenanceServices) {
       if (s.date.year == now.year) {
@@ -177,7 +189,6 @@ class StatisticsService {
     return breakdown;
   }
 
-  // Szerviz statisztikák (Tankolás NÉLKÜL)
   Map<String, dynamic> getServiceStats(List<Szerviz> services) {
     final realServices = services.where((s) =>
     !_isFuel(s) &&
@@ -214,31 +225,43 @@ class StatisticsService {
   }
 
   double getAverageDailyKm(List<Szerviz> services) {
-    if (services.length < 2) return 0;
-    services.sort((a, b) => a.date.compareTo(b.date));
+    if (services.isEmpty) return 0;
+    final realServices = services.where((s) => !s.description.startsWith('Emlékeztető alap: ')).toList();
+    if (realServices.length < 2) return 0;
+    
+    realServices.sort((a, b) => a.date.compareTo(b.date));
 
-    final first = services.first;
-    final last = services.last;
+    final first = realServices.first;
+    final last = realServices.last;
     final days = last.date.difference(first.date).inDays;
 
-    if (days == 0) return 0;
+    if (days <= 0) return 0;
     return (last.mileage - first.mileage) / days;
   }
 
-  Map<String, dynamic> predictOilChange(List<Szerviz> services) {
+  Map<String, dynamic> predictNextService(List<Szerviz> services) {
     final dailyKm = getAverageDailyKm(services);
-    if (dailyKm == 0) return {};
+    if (dailyKm <= 0) return {};
 
     try {
-      final lastOilChange = services.lastWhere((s) => s.description.toLowerCase().contains('olajcsere'));
-      final currentMileage = services.last.mileage;
-      final kmSinceChange = currentMileage - lastOilChange.mileage;
-      final kmLeft = 15000 - kmSinceChange;
+      // Megkeressük a legközelebbi emlékeztetőt
+      final reminders = services.where((s) => s.description.startsWith('Emlékeztető alap: ')).toList();
+      if (reminders.isEmpty) return {};
+
+      // Példa: Olajcsere predikció
+      final lastOil = reminders.firstWhere((s) => s.description.contains('Olajcsere'));
+      final currentMileage = services.map((s) => s.mileage).reduce(max);
+      
+      final kmSince = currentMileage - lastOil.mileage;
+      final kmLeft = 15000 - kmSince; // Alapértelmezett 15e km
+
+      if (kmLeft < 0) return {'type': 'Olajcsere', 'urgent': true};
 
       final daysLeft = kmLeft / dailyKm;
       final predictedDate = DateTime.now().add(Duration(days: daysLeft.toInt()));
 
       return {
+        'type': 'Olajcsere',
         'date': predictedDate,
         'daysLeft': daysLeft.toInt(),
         'kmLeft': kmLeft
@@ -250,11 +273,13 @@ class StatisticsService {
 
   int? getDaysUntilDeadline(List<Szerviz> services, String type) {
     try {
-      final lastEvent = services.lastWhere((s) => s.description.toLowerCase().contains(type.toLowerCase()));
-      if (lastEvent.date.isAfter(DateTime.now())) {
-        return lastEvent.date.difference(DateTime.now()).inDays;
-      }
-      final int validityDays = type.contains('műszaki') ? 730 : 365;
+      final relevant = services.where((s) => s.description.toLowerCase().contains(type.toLowerCase()) && !s.description.startsWith('Emlékeztető alap: ')).toList();
+      if (relevant.isEmpty) return null;
+      
+      relevant.sort((a, b) => b.date.compareTo(a.date));
+      final lastEvent = relevant.first;
+      
+      final int validityDays = type.toLowerCase().contains('műszaki') ? 730 : 365;
       final deadline = lastEvent.date.add(Duration(days: validityDays));
       return deadline.difference(DateTime.now()).inDays;
     } catch (e) {
@@ -264,9 +289,9 @@ class StatisticsService {
 
   Szerviz? findLastServiceByDescription(List<Szerviz> services, String description) {
     try {
-      final filtered = services.where((s) => s.description.toLowerCase().contains(description.toLowerCase())).toList();
+      final filtered = services.where((s) => s.description.toLowerCase().contains(description.toLowerCase()) && !s.description.startsWith('Emlékeztető alap: ')).toList();
       filtered.sort((a, b) => b.date.compareTo(a.date));
-      return filtered.first;
+      return filtered.isEmpty ? null : filtered.first;
     } catch (e) {
       return null;
     }

@@ -45,21 +45,20 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Container(
-            height: 40,
-            decoration: BoxDecoration(color: Colors.grey.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            height: 45,
+            decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
             child: TabBar(
               controller: _tabController,
               indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.primary),
-              labelColor: theme.brightness == Brightness.light ? Colors.white : Colors.black,
-              unselectedLabelColor: theme.textTheme.bodyMedium?.color,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
+              indicator: BoxDecoration(borderRadius: BorderRadius.circular(10), color: theme.colorScheme.primary, boxShadow: [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))]),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.grey,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               tabs: const [
-                Tab(text: 'ÁTTEKINTÉS'),
+                Tab(text: 'DASHBOARD'),
                 Tab(text: 'ÜZEMANYAG'),
                 Tab(text: 'PÉNZÜGY'),
-                Tab(text: 'ELŐREJELZÉS'),
+                Tab(text: 'PREDIKCIÓ'),
               ],
             ),
           ),
@@ -70,7 +69,7 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
             data: (services) => TabBarView(
               controller: _tabController,
               children: [
-                _buildOverviewTab(context, services),
+                _buildDashboardTab(context, services),
                 _buildFuelTab(context, services),
                 _buildFinanceTab(context, services),
                 _buildPredictionTab(context, services),
@@ -84,33 +83,75 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
     );
   }
 
-  // --- 1. ÁTTEKINTÉS FÜL ---
-  Widget _buildOverviewTab(BuildContext context, List<Szerviz> services) {
+  // --- 1. MODERN DASHBOARD FÜL ---
+  Widget _buildDashboardTab(BuildContext context, List<Szerviz> services) {
     final statsService = StatisticsService();
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
-    final dateFormat = DateFormat('yyyy. MM. dd.');
+    
+    final totalCost = statsService.calculateTotalCost(services);
+    final dailyKm = statsService.getAverageDailyKm(services);
+    final costDist = statsService.getCostDistribution(services);
+    final prediction = statsService.predictNextService(services);
 
-    final lastOilChange = statsService.findLastServiceByDescription(services, 'olajcsere');
-    final totalServiceCost = statsService.calculateTotalServiceCost(services);
-    final totalFuelCost = statsService.calculateTotalFuelCost(services);
-    final lastInspection = statsService.findLastServiceByDescription(services, 'műszaki vizsga');
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('AUTÓ ÁLLAPOT ÉS KÖLTSÉGEK', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1.1)),
+          const SizedBox(height: 20),
+          
+          // FŐ KÁRTYÁK GRID
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  _buildMainCard(
+                    constraints.maxWidth,
+                    icon: Icons.account_balance_wallet_rounded,
+                    title: 'Összesített Költség',
+                    value: '${numberFormat.format(totalCost.toInt())} Ft',
+                    subtitle: 'A járművödre fordított teljes összeg',
+                    color: Colors.blue.shade700,
+                  ),
+                  _buildMainCard(
+                    constraints.maxWidth,
+                    icon: Icons.trending_up_rounded,
+                    title: 'Napi Átlag Futás',
+                    value: '${dailyKm.toStringAsFixed(1)} km',
+                    subtitle: 'Használati intenzitás naponta',
+                    color: Colors.orange.shade700,
+                  ),
+                  _buildMainCard(
+                    constraints.maxWidth,
+                    icon: Icons.event_note_rounded,
+                    title: 'Várható Szerviz',
+                    value: prediction.isNotEmpty ? (prediction['urgent'] == true ? 'AZONNAL!' : DateFormat('yyyy. MM. dd.').format(prediction['date'])) : 'Nincs adat',
+                    subtitle: prediction.isNotEmpty ? 'Következő: ${prediction['type']}' : 'Kevés adat a jósláshoz',
+                    color: prediction['urgent'] == true ? Colors.red : Colors.green.shade700,
+                  ),
+                ],
+              );
+            }
+          ),
 
-    final stats = [
-      _StatCard(icon: Icons.oil_barrel, title: 'Utolsó olajcsere', value: lastOilChange != null ? dateFormat.format(lastOilChange.date) : 'Nincs adat', subtitle: lastOilChange != null ? '${numberFormat.format(lastOilChange.mileage)} km' : '', color: Colors.black87),
-      _StatCard(icon: Icons.build, title: 'Szervizköltség', value: '${numberFormat.format(totalServiceCost)} Ft', subtitle: 'Karbantartás, javítás', color: Colors.green),
-      _StatCard(icon: Icons.local_gas_station, title: 'Üzemanyagköltség', value: '${numberFormat.format(totalFuelCost)} Ft', subtitle: 'Összes tankolás', color: Colors.orange),
-      _StatCard(icon: Icons.verified, title: 'Műszaki érvényes', value: lastInspection != null ? dateFormat.format(DateTime(lastInspection.date.year + 2, lastInspection.date.month, lastInspection.date.day)) : 'Nincs adat', subtitle: 'A legutóbbi vizsga alapján', color: Colors.blue),
-    ];
+          const SizedBox(height: 32),
+          const Text('KÖLTSÉGMEGOSZLÁS (TCO)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12, letterSpacing: 1.2)),
+          const SizedBox(height: 16),
+          _buildCostDistributionBar(costDist),
 
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 350, childAspectRatio: 1.8, crossAxisSpacing: 16, mainAxisSpacing: 16),
-      padding: const EdgeInsets.all(16),
-      itemCount: stats.length,
-      itemBuilder: (context, index) => stats[index],
+          const SizedBox(height: 32),
+          const Text('UTOLSÓ ESEMÉNYEK', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12, letterSpacing: 1.2)),
+          const SizedBox(height: 16),
+          _buildRecentActivityList(services),
+        ],
+      ),
     );
   }
 
-  // --- 2. ÜZEMANYAG FÜL ---
+  // --- 2. ÜZEMANYAG FÜL (Frissítve) ---
   Widget _buildFuelTab(BuildContext context, List<Szerviz> services) {
     final theme = Theme.of(context);
     final monthFormat = DateFormat('yyyy. MMMM', 'hu_HU');
@@ -118,66 +159,37 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
     final statsService = StatisticsService();
 
     final currentStats = statsService.calculateMonthlyStats(services, _selectedMonth);
-    final prevMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1);
-    final prevStats = statsService.calculateMonthlyStats(services, prevMonth);
-
-    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
-    final dailyCost = currentStats.totalCost / daysInMonth;
-    final dailyKm = currentStats.totalDistance / daysInMonth;
-
+    
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _changeMonth(-1)),
-            Text(monthFormat.format(_selectedMonth).toUpperCase(), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeMonth(1)),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 18), onPressed: () => _changeMonth(-1)),
+              const SizedBox(width: 20),
+              Text(monthFormat.format(_selectedMonth).toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              const SizedBox(width: 20),
+              IconButton(icon: const Icon(Icons.arrow_forward_ios, size: 18), onPressed: () => _changeMonth(1)),
+            ],
+          ),
         ),
-        const Divider(),
+        const Divider(height: 1),
         Expanded(
-          child: (currentStats.totalCost == 0 && currentStats.totalDistance == 0)
-              ? const Center(child: Text('A kiválasztott hónapban nincsenek adatok.'))
+          child: (currentStats.totalCost == 0)
+              ? const Center(child: Text('Nincs tankolási adat ebben a hónapban.'))
               : SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: [
-                    _buildTrendCard(title: 'Havi Üzemanyag', value: '${numberFormat.format(currentStats.totalCost)} Ft', prevValue: prevStats.totalCost, currentValue: currentStats.totalCost, inverse: true, icon: Icons.account_balance_wallet, color: Colors.green),
-                    _buildTrendCard(title: 'Átlagfogyasztás', value: '${currentStats.avgConsumption.toStringAsFixed(1)} L', prevValue: prevStats.avgConsumption, currentValue: currentStats.avgConsumption, inverse: true, icon: Icons.local_gas_station, color: Colors.orange, unit: '/100km'),
-                    _buildTrendCard(title: 'Megtett Táv', value: '${numberFormat.format(currentStats.totalDistance)} km', prevValue: prevStats.totalDistance.toDouble(), currentValue: currentStats.totalDistance.toDouble(), inverse: false, icon: Icons.map, color: Colors.blue),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text('RÉSZLETES ELEMZÉS', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      children: [
-                        _StatRow(icon: Icons.water_drop, label: 'Összes tankolt mennyiség', value: '${currentStats.totalLiters.toStringAsFixed(1)} liter', color: Colors.teal),
-                        const Divider(),
-                        _StatRow(icon: Icons.price_change, label: 'Átlagos üzemanyagár', value: '${numberFormat.format(currentStats.avgPrice)} Ft/L', color: Colors.amber[800]!),
-                        const Divider(),
-                        // ÚJ SOR: KÖLTSÉG / KM
-                        _StatRow(icon: Icons.currency_exchange, label: 'Átlagos kilométerköltség', value: '${currentStats.avgCostPerKm.toStringAsFixed(1)} Ft / km', color: Colors.blueGrey),
-                        const Divider(),
-                        _StatRow(icon: Icons.calendar_today, label: 'Napi átlagos költség', value: '${numberFormat.format(dailyCost.toInt())} Ft / nap', color: Colors.redAccent),
-                        const Divider(),
-                        _StatRow(icon: Icons.speed, label: 'Napi átlagos futás', value: '${dailyKm.toStringAsFixed(1)} km / nap', color: Colors.indigo),
-                      ],
-                    ),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      _buildInfoRow(Icons.local_gas_station, 'Havi fogyasztás', '${currentStats.avgConsumption.toStringAsFixed(2)} L/100km', Colors.orange),
+                      _buildInfoRow(Icons.payments, 'Üzemanyagra költve', '${numberFormat.format(currentStats.totalCost)} Ft', Colors.green),
+                      _buildInfoRow(Icons.map, 'Havi futásteljesítmény', '${numberFormat.format(currentStats.totalDistance)} km', Colors.blue),
+                      _buildInfoRow(Icons.price_check, 'Átlagos liter ár', '${numberFormat.format(currentStats.avgPrice)} Ft/L', Colors.purple),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
         ),
       ],
     );
@@ -186,264 +198,167 @@ class _VehicleStatsViewState extends ConsumerState<VehicleStatsView> with Ticker
   // --- 3. PÉNZÜGY FÜL ---
   Widget _buildFinanceTab(BuildContext context, List<Szerviz> services) {
     final statsService = StatisticsService();
+    final topExpenses = statsService.getTopExpenses(services);
     final numberFormat = NumberFormat.decimalPattern('hu_HU');
 
-    final yearlyComparison = statsService.getYearlyComparison(services);
-    final topExpenses = statsService.getTopExpenses(services);
-    final fixedCosts = statsService.getFixedCostsBreakdown(services);
-    final serviceStats = statsService.getServiceStats(services);
-    final serviceCountLastYear = serviceStats['countLastYear'] as int;
-    final avgKmInterval = serviceStats['avgKmInterval'] as int;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTrendCard(
-              title: 'Idei Szervizköltség',
-              value: '${numberFormat.format(yearlyComparison['thisYear'])} Ft',
-              prevValue: yearlyComparison['lastYear']!,
-              currentValue: yearlyComparison['thisYear']!,
-              inverse: true,
-              icon: Icons.build,
-              color: Colors.blueGrey,
-              unit: ' vs Tavaly (csak szerviz)'
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text('LEGDRÁGÁBB SZERVIZEK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 16),
+        ...topExpenses.map((s) => Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: CircleAvatar(backgroundColor: Colors.red.shade50, child: const Icon(Icons.warning_amber_rounded, color: Colors.red)),
+            title: Text(s.description, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(DateFormat('yyyy. MM. dd.').format(s.date)),
+            trailing: Text('${numberFormat.format(s.cost)} Ft', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.red, fontSize: 16)),
           ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        const Text('Szervizlátogatások (elmúlt 1 év)', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text('$serviceCountLastYear alkalom', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red)),
-                        if (avgKmInterval > 0)
-                          Text('Átlagosan ${numberFormat.format(avgKmInterval)} km-enként', style: const TextStyle(fontSize: 12, color: Colors.grey))
-                        else
-                          const Text('Kevés adat az átlaghoz', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        const Text('Fix Költségek (Idén)', style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Text('${numberFormat.format(fixedCosts.values.fold(0.0, (a,b)=>a+b))} Ft', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.orange)),
-                        const Text('Biztosítás, Adó, Műszaki', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Text('TOP 5 LEGDRÁGÁBB SZERVIZ', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
-          const SizedBox(height: 16),
-          Card(
-            child: Column(
-              children: topExpenses.map((s) => ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.attach_money)),
-                title: Text(s.description, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(DateFormat('yyyy. MM. dd.').format(s.date)),
-                trailing: Text('${numberFormat.format(s.cost)} Ft', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red)),
-              )).toList(),
-            ),
-          )
-        ],
-      ),
+        )),
+      ],
     );
   }
 
-  // --- 4. ELŐREJELZÉS FÜL ---
+  // --- 4. PREDIKCIÓ FÜL ---
   Widget _buildPredictionTab(BuildContext context, List<Szerviz> services) {
     final statsService = StatisticsService();
-    final oilPrediction = statsService.predictOilChange(services);
-    final daysUntilInspection = statsService.getDaysUntilDeadline(services, 'műszaki');
-    final daysUntilInsurance = statsService.getDaysUntilDeadline(services, 'biztosítás');
-    final numberFormat = NumberFormat.decimalPattern('hu_HU');
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+    final daysUntilMuzsaki = statsService.getDaysUntilDeadline(services, 'műszaki');
+    
+    return Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('HATÁRIDŐK', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _buildDeadlineCard('Műszaki Vizsga', daysUntilInspection, Icons.verified)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildDeadlineCard('Kötelező Biztosítás', daysUntilInsurance, Icons.security)),
-            ],
-          ),
+          const Icon(Icons.auto_awesome, size: 64, color: Colors.amber),
+          const SizedBox(height: 24),
+          const Text('MESTERSÉGES INTELLIGENCIA ALAPÚ BECSLÉS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
           const SizedBox(height: 32),
-          const Text('OKOS PREDIKCIÓ', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Colors.grey)),
-          const SizedBox(height: 16),
-          if (oilPrediction.isNotEmpty)
-            Card(
-              color: Colors.orange.shade50,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.orange.shade200)),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    const Icon(Icons.oil_barrel, size: 48, color: Colors.orange),
-                    const SizedBox(width: 24),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Várható Olajcsere', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.orange)),
-                        const SizedBox(height: 8),
-                        Text(DateFormat('yyyy. MMMM dd.').format(oilPrediction['date']), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24)),
-                        Text('Még kb. ${oilPrediction['daysLeft']} nap (${numberFormat.format(oilPrediction['kmLeft'])} km)', style: const TextStyle(color: Colors.grey)),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            )
+          if (daysUntilMuzsaki != null)
+             _buildPredictionCard('Műszaki vizsga lejárata', '$daysUntilMuzsaki nap múlva', daysUntilMuzsaki < 30 ? Colors.red : Colors.green)
           else
-            const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Nincs elég adat az olajcsere becsléséhez.'))),
+            const Text('Nincs elég adat az előrejelzéshez.'),
         ],
       ),
     );
   }
 
-  // --- WIDGET HELPEREK ---
+  // --- MODERNEBB WIDGETEK ---
 
-  Widget _buildTrendCard({required String title, required String value, required double prevValue, required double currentValue, required bool inverse, required IconData icon, required Color color, String unit = ''}) {
-    double diff = currentValue - prevValue;
-    bool isBetter = inverse ? diff < 0 : diff > 0;
-    bool isSame = diff == 0 || prevValue == 0;
-    String diffText = prevValue > 0 ? '${((diff / prevValue) * 100).abs().toStringAsFixed(1)}%' : 'N/A';
-
+  Widget _buildMainCard(double width, {required IconData icon, required String title, required String value, required String subtitle, required Color color}) {
+    final cardWidth = width > 800 ? (width - 64) / 3 : (width - 32);
     return Container(
-      width: 300,
+      width: cardWidth,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 20)), const SizedBox(width: 12), Text(title, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))]),
-          const SizedBox(height: 16),
-          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)), if (unit.isNotEmpty) Text(unit, style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.8))]),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 20),
+          Text(title, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 13)),
           const SizedBox(height: 8),
-          if (!isSame) Row(children: [Icon(diff > 0 ? Icons.arrow_upward : Icons.arrow_downward, size: 16, color: isBetter ? Colors.green : Colors.red), const SizedBox(width: 4), Text(diffText, style: TextStyle(color: isBetter ? Colors.green : Colors.red, fontWeight: FontWeight.bold)), const Text(' vs múlt év/hó', style: TextStyle(color: Colors.grey, fontSize: 12))]) else const Text('Nincs változás', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
         ],
       ),
     );
   }
 
-  Widget _buildDeadlineCard(String title, int? daysLeft, IconData icon) {
-    Color color = Colors.green;
-    String text = 'Nincs adat';
-    if (daysLeft != null) {
-      if (daysLeft < 30) color = Colors.red; else if (daysLeft < 90) color = Colors.orange;
-      text = '$daysLeft nap';
-    }
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(text, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// --- Top-Level Segédosztályok ---
-
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final String subtitle;
-  final Color color;
-
-  const _StatCard({required this.icon, required this.title, required this.value, required this.subtitle, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+  Widget _buildCostDistributionBar(Map<String, double> dist) {
+    return Column(
+      children: [
+        Container(
+          height: 35,
+          width: double.infinity,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.grey.withOpacity(0.1)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                if (dist['fuel']! > 0) Expanded(flex: (dist['fuel']! * 100).toInt(), child: Container(color: Colors.orange, child: const Center(child: Icon(Icons.local_gas_station, size: 14, color: Colors.white)))),
+                if (dist['service']! > 0) Expanded(flex: (dist['service']! * 100).toInt(), child: Container(color: Colors.blue, child: const Center(child: Icon(Icons.build, size: 14, color: Colors.white)))),
+                if (dist['fixed']! > 0) Expanded(flex: (dist['fixed']! * 100).toInt(), child: Container(color: Colors.purple, child: const Center(child: Icon(Icons.security, size: 14, color: Colors.white)))),
               ],
             ),
-            const Spacer(),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-            ),
-            if (subtitle.isNotEmpty) Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildLegendItem('Üzemanyag', Colors.orange, '${(dist['fuel']! * 100).toStringAsFixed(0)}%'),
+            _buildLegendItem('Szerviz', Colors.blue, '${(dist['service']! * 100).toStringAsFixed(0)}%'),
+            _buildLegendItem('Fix költség', Colors.purple, '${(dist['fixed']! * 100).toStringAsFixed(0)}%'),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color, String percent) {
+    return Row(
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(width: 4),
+        Text(percent, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildRecentActivityList(List<Szerviz> services) {
+    final recent = services.where((s) => !s.description.startsWith('Emlékeztető alap: ')).take(3).toList();
+    return Column(
+      children: recent.map((s) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          children: [
+            Icon(s.description.contains('tankolás') ? Icons.local_gas_station : Icons.settings, size: 18, color: Colors.grey),
+            const SizedBox(width: 12),
+            Expanded(child: Text(s.description, style: const TextStyle(fontWeight: FontWeight.w600))),
+            Text(DateFormat('MM. dd.').format(s.date), style: const TextStyle(color: Colors.grey, fontSize: 12)),
           ],
         ),
+      )).toList(),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 16),
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ],
       ),
     );
   }
-}
 
-class _StatRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatRow({required this.icon, required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildPredictionCard(String title, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withOpacity(0.2))),
+      child: Column(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 15)),
-            ],
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: color)),
         ],
       ),
     );

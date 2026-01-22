@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:olajfolt_web/providers.dart';
 import 'package:olajfolt_web/theme_provider.dart';
-import 'package:olajfolt_web/ui/home_page.dart'; // FONTOS: Ez az import kell a hiba javításához!
-import 'package:olajfolt_web/ui/calculators/transfer_cost_page.dart';
+import 'package:olajfolt_web/ui/home_page.dart';
+import 'package:olajfolt_web/ui/calculators/calculators_menu_page.dart';
 import 'package:olajfolt_web/ui/notification_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -114,7 +114,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
     return Scaffold(
       body: Stack(
         children: [
-          // KÉP HOZZÁADÁSA A JOBB ALSÓ SAROKBA
           Positioned(
             bottom: 75,
             right: 0,
@@ -129,7 +128,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
           ),
 
           Scaffold(
-            backgroundColor: Colors.transparent, // Hogy a háttérkép átlátszódjon
+            backgroundColor: Colors.transparent,
             appBar: AppBar(
               backgroundColor: const Color(0xFF1E1E1E),
               foregroundColor: Colors.white,
@@ -195,11 +194,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomePage())),
                             ),
                             _MenuCard(
-                              title: 'KALKULÁTOR',
-                              subtitle: 'Átírási költségek számítása',
+                              title: 'KALKULÁTOROK',
+                              subtitle: 'Átírási és értékbecslő eszközök',
                               icon: Icons.calculate,
                               color: Colors.blue,
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransferCostCalculatorPage())),
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalculatorsMenuPage())),
                             ),
                             _MenuCard(
                               title: 'ÉRTESÍTÉSEK',
@@ -260,7 +259,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
             ),
           ),
 
-          // --- VALÓS STÁTUSZ JELZŐ (HEARTBEAT ALAPJÁN) ---
           if (auth != null)
             Positioned(
               bottom: 24,
@@ -290,7 +288,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                     const SizedBox(width: 12),
                   ],
 
-                  // HEARTBEAT FIGYELŐ
                   StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance.collection('users').doc(auth.uid).snapshots(),
                     builder: (context, snapshot) {
@@ -431,7 +428,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   Future<void> _showDeleteAccountDialog(BuildContext context, WidgetRef ref) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // User must tap a button to dismiss
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1E1E1E),

@@ -1,7 +1,7 @@
-// lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../modellek/jarmu.dart';
 import '../modellek/karbantartas_bejegyzes.dart';
+import '../alap/konstansok.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -40,7 +40,6 @@ class FirestoreService {
 
     int newId;
     if (jarmu.id == null) {
-      // Új jármű esetén is használjunk időbélyeget, hogy véletlenül se ütközzön semmivel
       newId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       data['id'] = newId;
     } else {
@@ -80,14 +79,38 @@ class FirestoreService {
     data['cost'] = szerviz.cost;
     data['vehicleId'] = vehicleNumericId;
     
+    // 1. Mentjük magát a szerviz bejegyzést
     if (szerviz.id != null && szerviz.id!.isNotEmpty) {
       await _servicesRef(userId, vehicleId).doc(szerviz.id!).set(data, SetOptions(merge: true));
     } else {
-      // JAVÍTVA: length+1 helyett egyedi időbélyeg ID
-      // Így Car A és Car B szervizei sosem fognak ütközni (nem lesz mindkettőnek "1"-es szervize)
       final String uniqueId = DateTime.now().millisecondsSinceEpoch.toString();
-      data['id'] = int.parse(uniqueId.substring(uniqueId.length - 9)); // Biztonságos integer ID
+      data['id'] = int.parse(uniqueId.substring(uniqueId.length - 9));
       await _servicesRef(userId, vehicleId).doc(uniqueId).set(data);
+    }
+
+    // 2. Ha ez egy emlékeztető alapú szerviz (pl. Olajcsere, Műszaki), frissítsük a rejtett alap rekordot is
+    // Ez biztosítja, hogy a webapp TAB 1 (Emlékeztetők) és a mobilapp is azonnal frissüljön
+    if (ALL_REMINDER_SERVICE_TYPES.contains(szerviz.description)) {
+      final reminderDesc = REMINDER_PREFIX + szerviz.description;
+      
+      try {
+        final query = await _servicesRef(userId, vehicleId)
+            .where('description', isEqualTo: reminderDesc)
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          // Csak a releváns adatokat frissítjük az emlékeztető alapban
+          await query.docs.first.reference.update({
+            'date': data['date'],
+            'mileage': data['mileage'],
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
+          print("✅ Emlékeztető alap frissítve: $reminderDesc");
+        }
+      } catch (e) {
+        print("❌ Hiba az emlékeztető alap frissítésekor: $e");
+      }
     }
   }
 

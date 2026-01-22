@@ -8,9 +8,12 @@ class Jarmu {
   final int mileage;
   final String? vin;
   final String? vezerlesTipusa;
-  final String? radioCode; // ÚJ MEZŐ
-  // ÚJ: Egyedi intervallumok a webes szinkronhoz
+  final String? radioCode;
   final Map<String, int>? customIntervals;
+  
+  // ÚJ: Extra adatok az értékbecsléshez és egyéb funkciókhoz
+  // Így nem törjük meg a mobil appot, mert ismeretlen mezőként kezeli
+  final Map<String, dynamic>? extraData;
 
   Jarmu({
     this.id,
@@ -23,6 +26,7 @@ class Jarmu {
     this.vezerlesTipusa,
     this.radioCode,
     this.customIntervals,
+    this.extraData,
   });
 
   Jarmu copyWith({
@@ -36,6 +40,7 @@ class Jarmu {
     String? vezerlesTipusa,
     String? radioCode,
     Map<String, int>? customIntervals,
+    Map<String, dynamic>? extraData,
   }) {
     return Jarmu(
       id: id ?? this.id,
@@ -48,6 +53,7 @@ class Jarmu {
       vezerlesTipusa: vezerlesTipusa ?? this.vezerlesTipusa,
       radioCode: radioCode ?? this.radioCode,
       customIntervals: customIntervals ?? this.customIntervals,
+      extraData: extraData ?? this.extraData,
     );
   }
 
@@ -82,6 +88,9 @@ class Jarmu {
       customIntervals: data['customIntervals'] != null 
           ? Map<String, int>.from(data['customIntervals']) 
           : null,
+      extraData: data['extraData'] != null 
+          ? Map<String, dynamic>.from(data['extraData']) 
+          : null,
     );
   }
 
@@ -99,6 +108,10 @@ class Jarmu {
 
     if (customIntervals != null) {
       data['customIntervals'] = customIntervals;
+    }
+    
+    if (extraData != null) {
+      data['extraData'] = extraData;
     }
 
     return data;
