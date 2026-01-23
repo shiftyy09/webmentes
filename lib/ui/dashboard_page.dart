@@ -9,6 +9,7 @@ import 'package:olajfolt_web/ui/notification_settings_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 class DashboardPage extends ConsumerStatefulWidget {
@@ -32,6 +33,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   bool _isOnline = true;
   StreamSubscription? _connectivitySubscription;
   bool _isRefreshing = false;
+  String? _cooldownMessage;
 
   @override
   void initState() {
@@ -56,6 +58,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startAnimationSequence();
+      _checkRefreshCooldown();
     });
 
     _safetyTimer = Timer(const Duration(seconds: 3), () {
@@ -63,6 +66,24 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
         setState(() => _showIntro = false);
       }
     });
+  }
+
+  Future<void> _checkRefreshCooldown() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastRefresh = prefs.getInt('last_web_refresh_timestamp') ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    const twelveHours = 12 * 60 * 60 * 1000;
+
+    if (now - lastRefresh < twelveHours) {
+      final remaining = twelveHours - (now - lastRefresh);
+      final hours = (remaining / (1000 * 60 * 60)).floor();
+      final minutes = ((remaining / (1000 * 60)) % 60).floor();
+      if (mounted) {
+        setState(() => _cooldownMessage = "Frissítés elérhető: ${hours}ó ${minutes}p múlva");
+      }
+    } else {
+      if (mounted) setState(() => _cooldownMessage = null);
+    }
   }
 
   void _updateConnectionStatus(List<ConnectivityResult> results) {
@@ -86,12 +107,123 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
 
   Future<void> _manualRefresh() async {
     if (_isRefreshing) return;
+    
+    if (_cooldownMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Kérlek várj! $_cooldownMessage'),
+          backgroundColor: Colors.orange.shade800,
+          behavior: SnackBarBehavior.floating,
+        )
+      );
+      return;
+    }
+
     setState(() => _isRefreshing = true);
 
-    ref.refresh(vehiclesProvider);
-    await Future.delayed(const Duration(milliseconds: 1000));
+    try {
+      ref.invalidate(vehiclesProvider);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('last_web_refresh_timestamp', DateTime.now().millisecondsSinceEpoch);
+      await Future.delayed(const Duration(milliseconds: 1500));
+      await _checkRefreshCooldown();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Adatok szinkronizálva a Firebase-el!'), backgroundColor: Colors.green)
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
 
-    if (mounted) setState(() => _isRefreshing = false);
+  // --- HIBAJELENTÉS DIALÓGUS ---
+  void _showBugReportDialog(BuildContext context) {
+    final reportController = TextEditingController();
+    String selectedCategory = 'UI hiba / Megjelenítés';
+    final categories = ['UI hiba / Megjelenítés', 'Számítási hiba', 'Szinkronizációs hiba', 'Fejlesztési javaslat', 'Egyéb'];
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: Colors.amber, width: 0.5)),
+          title: const Row(
+            children: [
+              Icon(Icons.bug_report, color: Colors.amber),
+              SizedBox(width: 12),
+              Text('Hibajelentés / Visszajelzés', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Milyen típusú hibát észlelt?', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  dropdownColor: const Color(0xFF2A2A2A),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12)),
+                  items: categories.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedCategory = v!),
+                ),
+                const SizedBox(height: 20),
+                const Text('Hiba leírása vagy javaslat:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: reportController,
+                  maxLines: 5,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Kérjük, írja le röviden a tapasztalt problémát...',
+                    hintStyle: TextStyle(color: Colors.white24),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSending ? null : () => Navigator.pop(context),
+              child: const Text('Mégse', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+              onPressed: isSending ? null : () async {
+                if (reportController.text.trim().isEmpty) return;
+                setDialogState(() => isSending = true);
+                
+                try {
+                  final user = ref.read(authStateProvider).value;
+                  await FirebaseFirestore.instance.collection('bug_reports').add({
+                    'userId': user?.uid ?? 'Ismeretlen',
+                    'email': user?.email ?? 'Nincs email',
+                    'category': selectedCategory,
+                    'message': reportController.text.trim(),
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'platform': 'web',
+                  });
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Köszönjük! Bejelentését rögzítettük.'), backgroundColor: Colors.green));
+                  }
+                } catch (e) {
+                  setDialogState(() => isSending = false);
+                }
+              },
+              child: isSending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Text('Küldés'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -175,9 +307,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
-                        Text(
+                        const Text(
                           'Válasszon az alábbi modulok közül:',
-                          style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                         const SizedBox(height: 50),
 
@@ -207,6 +339,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                               color: Colors.green,
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
                             ),
+                            _MenuCard(
+                              title: 'HIBAJELENTÉS',
+                              subtitle: 'Segítsen jobbá tenni a rendszert',
+                              icon: Icons.feedback_outlined,
+                              color: Colors.amber,
+                              onTap: () => _showBugReportDialog(context),
+                            ),
                           ],
                         ),
 
@@ -234,6 +373,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                               if (await canLaunchUrl(url)) await launchUrl(url);
                             },
                             child: const Text('NJ-CREATIVE', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                          const SizedBox(width: 20),
+                          const Text('|', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                          const SizedBox(width: 20),
+                          TextButton.icon(
+                            icon: const Icon(Icons.bug_report, color: Colors.amber, size: 14),
+                            label: const Text('Hiba bejelentése', style: TextStyle(color: Colors.amber, fontSize: 12)),
+                            onPressed: () => _showBugReportDialog(context),
                           ),
                           const SizedBox(width: 20),
                           const Text('|', style: TextStyle(color: Colors.white54, fontSize: 12)),
@@ -272,16 +419,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                       child: InkWell(
                         onTap: _manualRefresh,
                         borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
+                        child: Tooltip(
+                          message: _cooldownMessage ?? 'Kényszerített frissítés a felhőből',
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: _cooldownMessage == null ? Colors.white24 : Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: _isRefreshing
+                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : Icon(Icons.refresh, color: _cooldownMessage == null ? Colors.white : Colors.white38, size: 20),
                           ),
-                          child: _isRefreshing
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.refresh, color: Colors.white, size: 20),
                         ),
                       ),
                     ),
@@ -291,12 +441,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                   StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance.collection('users').doc(auth.uid).snapshots(),
                     builder: (context, snapshot) {
-                      String statusText = 'Kapcsolódás...';
+                      String statusText = 'Várakozás...';
                       Color statusColor = Colors.grey;
                       bool isPhoneActive = false;
 
                       if (!_isOnline) {
-                        statusText = 'Nincs internetkapcsolat';
+                        statusText = 'Offline';
                         statusColor = Colors.redAccent;
                       } else if (snapshot.hasData && snapshot.data!.exists) {
                         final data = snapshot.data!.data() as Map<String, dynamic>?;
@@ -305,18 +455,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                         if (lastSync != null) {
                           final diff = DateTime.now().difference(lastSync.toDate());
                           if (diff.inMinutes < 15) {
-                            statusText = 'Mobilapp szinkronizálva';
+                            statusText = 'Mobil csatlakoztatva';
                             statusColor = Colors.greenAccent;
                             isPhoneActive = true;
                           } else if (diff.inHours < 24) {
-                            statusText = 'Mobil utoljára aktív: ${diff.inHours} órája';
+                            statusText = 'Mobil nem elérhető (${diff.inHours}ó)';
                             statusColor = Colors.orangeAccent;
                           } else {
-                            statusText = 'Mobil inaktív (>1 napja)';
+                            statusText = 'Mobil inaktív';
                             statusColor = Colors.grey;
                           }
                         } else {
-                          statusText = 'Mobilapp még nem csatlakozott';
+                          statusText = 'Nincs mobil kapcsolat';
                           statusColor = Colors.orangeAccent;
                         }
                       }
