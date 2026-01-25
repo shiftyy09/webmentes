@@ -35,6 +35,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
   bool _isRefreshing = false;
   String? _cooldownMessage;
 
+  final Color brandOrange = const Color(0xFFE69500);
+
   @override
   void initState() {
     super.initState();
@@ -112,7 +114,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Kérlek várj! $_cooldownMessage'),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: brandOrange,
           behavior: SnackBarBehavior.floating,
         )
       );
@@ -138,92 +140,28 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
     }
   }
 
-  // --- HIBAJELENTÉS DIALÓGUS ---
-  void _showBugReportDialog(BuildContext context) {
-    final reportController = TextEditingController();
-    String selectedCategory = 'UI hiba / Megjelenítés';
-    final categories = ['UI hiba / Megjelenítés', 'Számítási hiba', 'Szinkronizációs hiba', 'Fejlesztési javaslat', 'Egyéb'];
-    bool isSending = false;
+  // APP MEGOLDÁS: Közvetlen email küldés klienssel, aszinkron várakozás nélkül a híváskor (Browser gesture)
+  Future<void> _sendFeedbackEmail() async {
+    const String toEmail = 'shiftyy09@gmail.com';
+    const String subject = 'Visszajelzés - Olajfolt Web 1.0';
+    const String body = 'Szia!\n\nAzért írok, mert... (Kérlek, itt írd le a hibát vagy javaslatot)\n\n\n\n--- Technikai infók (ne töröld) ---\nPlatform: Web\n';
 
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: Colors.amber, width: 0.5)),
-          title: const Row(
-            children: [
-              Icon(Icons.bug_report, color: Colors.amber),
-              SizedBox(width: 12),
-              Text('Hibajelentés / Visszajelzés', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Milyen típusú hibát észlelt?', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedCategory,
-                  dropdownColor: const Color(0xFF2A2A2A),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12)),
-                  items: categories.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  onChanged: (v) => setDialogState(() => selectedCategory = v!),
-                ),
-                const SizedBox(height: 20),
-                const Text('Hiba leírása vagy javaslat:', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: reportController,
-                  maxLines: 5,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    hintText: 'Kérjük, írja le röviden a tapasztalt problémát...',
-                    hintStyle: TextStyle(color: Colors.white24),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSending ? null : () => Navigator.pop(context),
-              child: const Text('Mégse', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
-              onPressed: isSending ? null : () async {
-                if (reportController.text.trim().isEmpty) return;
-                setDialogState(() => isSending = true);
-                
-                try {
-                  final user = ref.read(authStateProvider).value;
-                  await FirebaseFirestore.instance.collection('bug_reports').add({
-                    'userId': user?.uid ?? 'Ismeretlen',
-                    'email': user?.email ?? 'Nincs email',
-                    'category': selectedCategory,
-                    'message': reportController.text.trim(),
-                    'timestamp': FieldValue.serverTimestamp(),
-                    'platform': 'web',
-                  });
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Köszönjük! Bejelentését rögzítettük.'), backgroundColor: Colors.green));
-                  }
-                } catch (e) {
-                  setDialogState(() => isSending = false);
-                }
-              },
-              child: isSending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Text('Küldés'),
-            ),
-          ],
-        ),
-      ),
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: toEmail,
+      query: 'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
     );
+
+    try {
+      // Weben a LaunchMode.externalApplication a legbiztosabb mailto esetén, hogy ne blokkolja a böngésző
+      await launchUrl(emailLaunchUri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hiba: Nem sikerült megnyitni az e-mail klienst.'), backgroundColor: Colors.red)
+        );
+      }
+    }
   }
 
   @override
@@ -309,7 +247,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                         const SizedBox(height: 16),
                         const Text(
                           'Válasszon az alábbi modulok közül:',
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                          style: TextStyle(color: Colors.black, fontSize: 16),
                         ),
                         const SizedBox(height: 50),
 
@@ -319,32 +257,32 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                           alignment: WrapAlignment.center,
                           children: [
                             _MenuCard(
-                              title: 'JÁRMŰVEK',
+                              title: 'JÁRMÜVEK',
                               subtitle: 'Szerviznapló és karbantartás',
-                              icon: Icons.directions_car,
+                              icon: Icons.directions_car_rounded,
                               color: Colors.orange,
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomePage())),
                             ),
                             _MenuCard(
                               title: 'KALKULÁTOROK',
                               subtitle: 'Átírási és értékbecslő eszközök',
-                              icon: Icons.calculate,
+                              icon: Icons.calculate_rounded,
                               color: Colors.blue,
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalculatorsMenuPage())),
                             ),
                             _MenuCard(
                               title: 'ÉRTESÍTÉSEK',
                               subtitle: 'E-mail emlékeztetők beállítása',
-                              icon: Icons.notifications_active,
+                              icon: Icons.notifications_active_rounded,
                               color: Colors.green,
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsPage())),
                             ),
                             _MenuCard(
                               title: 'HIBAJELENTÉS',
                               subtitle: 'Segítsen jobbá tenni a rendszert',
-                              icon: Icons.feedback_outlined,
-                              color: Colors.amber,
-                              onTap: () => _showBugReportDialog(context),
+                              icon: Icons.bug_report_rounded,
+                              color: brandOrange,
+                              onTap: _sendFeedbackEmail, // APP MEGOLDÁS: Közvetlen email
                             ),
                           ],
                         ),
@@ -378,15 +316,15 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                           const Text('|', style: TextStyle(color: Colors.white54, fontSize: 12)),
                           const SizedBox(width: 20),
                           TextButton.icon(
-                            icon: const Icon(Icons.bug_report, color: Colors.amber, size: 14),
-                            label: const Text('Hiba bejelentése', style: TextStyle(color: Colors.amber, fontSize: 12)),
-                            onPressed: () => _showBugReportDialog(context),
+                            icon: Icon(Icons.bug_report_rounded, color: brandOrange, size: 14),
+                            label: Text('Hiba bejelentése', style: TextStyle(color: brandOrange, fontSize: 12)),
+                            onPressed: _sendFeedbackEmail, // APP MEGOLDÁS: Közvetlen email
                           ),
                           const SizedBox(width: 20),
                           const Text('|', style: TextStyle(color: Colors.white54, fontSize: 12)),
                           const SizedBox(width: 20),
                           TextButton.icon(
-                            icon: const Icon(Icons.warning_amber, color: Colors.redAccent, size: 14),
+                            icon: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 14),
                             label: const Text('Fiók törlése', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                             onPressed: () => _showDeleteAccountDialog(context, ref),
                             style: TextButton.styleFrom(
@@ -442,7 +380,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                     stream: FirebaseFirestore.instance.collection('users').doc(auth.uid).snapshots(),
                     builder: (context, snapshot) {
                       String statusText = 'Várakozás...';
+                      String? lastSeenText;
                       Color statusColor = Colors.grey;
+                      IconData statusIcon = Icons.phonelink_off_rounded;
                       bool isPhoneActive = false;
 
                       if (!_isOnline) {
@@ -454,13 +394,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
 
                         if (lastSync != null) {
                           final diff = DateTime.now().difference(lastSync.toDate());
-                          if (diff.inMinutes < 15) {
-                            statusText = 'Mobil csatlakoztatva';
-                            statusColor = Colors.greenAccent;
-                            isPhoneActive = true;
+                          
+                          // Formázott idő szöveg
+                          if (diff.inMinutes < 60) {
+                            lastSeenText = 'Utolsó szinkron: ${diff.inMinutes} perce';
                           } else if (diff.inHours < 24) {
-                            statusText = 'Mobil nem elérhető (${diff.inHours}ó)';
-                            statusColor = Colors.orangeAccent;
+                            lastSeenText = 'Utolsó szinkron: ${diff.inHours} órája';
+                          } else {
+                            lastSeenText = 'Utolsó szinkron: ${diff.inDays} napja';
+                          }
+
+                          if (diff.inHours < 24) {
+                            // 24 órán belül zöldnek vesszük és aktív szinkronnak
+                            statusText = 'Szinkronizálás aktív';
+                            statusColor = Colors.greenAccent;
+                            statusIcon = Icons.check_circle_rounded;
+                            isPhoneActive = true;
                           } else {
                             statusText = 'Mobil inaktív';
                             statusColor = Colors.grey;
@@ -472,12 +421,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                       }
 
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.8),
+                          color: Colors.black.withOpacity(0.85),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
-                            BoxShadow(color: statusColor.withOpacity(0.2), blurRadius: 10, spreadRadius: 2),
+                            BoxShadow(color: statusColor.withOpacity(0.25), blurRadius: 12, spreadRadius: 2),
                           ],
                           border: Border.all(color: Colors.white10),
                         ),
@@ -491,10 +440,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                               )
                             else
                               Container(width: 10, height: 10, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(statusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                if (lastSeenText != null)
+                                  Text(lastSeenText, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                              ],
+                            ),
                             const SizedBox(width: 12),
-                            Text(statusText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                            const SizedBox(width: 4),
-                            Icon(isPhoneActive ? Icons.phonelink_ring : Icons.phonelink_off, color: Colors.white54, size: 16),
+                            Icon(statusIcon, color: statusColor, size: 16),
                           ],
                         ),
                       );
@@ -541,37 +498,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
             ),
         ],
       ),
-    );
-  }
-
-  Future<void> _showInfoDialog(BuildContext context, {required String title, required String content, required IconData icon, required Color color}) async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: color),
-          ),
-          title: Row(
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(width: 10),
-              Text(title, style: const TextStyle(color: Colors.white)),
-            ],
-          ),
-          content: Text(content, style: const TextStyle(color: Colors.white70)),
-          actions: <Widget>[
-            TextButton(
-              child: Text('OK', style: TextStyle(color: color)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -630,21 +556,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
                 try {
                   Navigator.of(dialogContext).pop();
                   await authService.deleteAccount();
-                  if (mounted) {
-                    _showInfoDialog(context,
-                        title: 'Sikeres törlés',
-                        content: 'A fiók és a hozzá tartozó adatok sikeresen törölve lettek.',
-                        icon: Icons.check_circle,
-                        color: Colors.green);
-                  }
                 } catch (e) {
-                  if (mounted) {
-                    _showInfoDialog(context,
-                        title: 'Hiba a törlés során',
-                        content: 'Hiba történt a fiók törlése közben. Kérjük, próbálja újra később. Hiba: ${e.toString()}',
-                        icon: Icons.error,
-                        color: Colors.red);
-                  }
+                  // ignore
                 }
               },
             ),
@@ -675,7 +588,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> with TickerProvid
           const SizedBox(width: 20),
           ElevatedButton.icon(
             onPressed: () async {
-              final url = Uri.parse('https://olajfolt.hu/app');
+              final url = Uri.parse('https://play.google.com/store/apps/details?id=hu.olajfolt.app');
               if (await canLaunchUrl(url)) await launchUrl(url);
             },
             icon: const Icon(Icons.download, size: 18, color: Color(0xFF1B5E20)),
@@ -706,6 +619,10 @@ class _MenuCardState extends State<_MenuCard> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    // JAVÍTÁS: Világos témánál a címek legyenek feketék (sárga/narancs helyett)
+    final Color textColor = isDark ? Colors.white : Colors.black;
+
     return InkWell(
       onTap: widget.onTap,
       onHover: (val) => setState(() => _isHovered = val),
@@ -724,9 +641,13 @@ class _MenuCardState extends State<_MenuCard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: widget.color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(widget.icon, size: 40, color: widget.color)),
+            Container(
+              padding: const EdgeInsets.all(16), 
+              decoration: BoxDecoration(color: widget.color.withOpacity(0.1), shape: BoxShape.circle), 
+              child: Icon(widget.icon, size: 40, color: widget.color),
+            ),
             const SizedBox(height: 20),
-            Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+            Text(widget.title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: textColor)),
             const SizedBox(height: 8),
             Text(widget.subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12), textAlign: TextAlign.center),
           ],

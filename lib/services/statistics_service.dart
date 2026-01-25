@@ -226,17 +226,31 @@ class StatisticsService {
 
   double getAverageDailyKm(List<Szerviz> services) {
     if (services.isEmpty) return 0;
-    final realServices = services.where((s) => !s.description.startsWith('Emlékeztető alap: ')).toList();
+    
+    // Csak a valós bejegyzéseket nézzük (tankolás + szerviz), a rejtett emlékeztetőket nem
+    final realServices = services
+        .where((s) => !s.description.startsWith('Emlékeztető alap: '))
+        .toList();
+        
     if (realServices.length < 2) return 0;
     
-    realServices.sort((a, b) => a.date.compareTo(b.date));
+    // Dátum szerint sorba rendezzük (legfrissebb elöl)
+    realServices.sort((a, b) => b.date.compareTo(a.date));
 
-    final first = realServices.first;
-    final last = realServices.last;
+    // JAVÍTÁS: Csak az utolsó legfeljebb 5 bejegyzés alapján számolunk átlagot,
+    // hogy a JELENLEGI használatot tükrözze az autó teljes élettartama helyett.
+    final recentOnes = realServices.take(5).toList();
+    
+    final last = recentOnes.first;  // Időben a legújabb
+    final first = recentOnes.last;  // A mintában a legrégebbi
+    
     final days = last.date.difference(first.date).inDays;
+    final kmDiff = last.mileage - first.mileage;
 
-    if (days <= 0) return 0;
-    return (last.mileage - first.mileage) / days;
+    // Ha ugyanazon a napon történt minden, vagy nincs km különbség, nullát adunk vissza
+    if (days <= 0 || kmDiff <= 0) return 0;
+    
+    return kmDiff / days;
   }
 
   Map<String, dynamic> predictNextService(List<Szerviz> services) {
