@@ -108,7 +108,7 @@ class HomePage extends ConsumerWidget {
                     const SizedBox(width: 24),
                     InkWell(
                       onTap: () async {
-                        final url = Uri.parse('https://olajfolt.hu/app');
+                        final url = Uri.parse('https://play.google.com/store/apps/details?id=hu.olajfolt.app');
                         if (await canLaunchUrl(url)) {
                           await launchUrl(url);
                         }
