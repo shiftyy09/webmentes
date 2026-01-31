@@ -28,7 +28,20 @@ class StatisticsService {
     return s.description.toLowerCase().contains('tankolás');
   }
 
-  // CSAK a szervizköltségek (tankolás és rendszeradatok nélkül)
+  // JAVÍTÁS: Univerzális liter kivonó (Regex alapú)
+  double _extractLiters(String description) {
+    try {
+      // Megkeressük a zárójelek közötti részt: (11.2 L) vagy (11,2L) stb.
+      final regex = RegExp(r'\(([\d.,]+)\s*[lL]?\)');
+      final match = regex.firstMatch(description);
+      if (match != null) {
+        final valueStr = match.group(1)!.replaceAll(',', '.');
+        return double.tryParse(valueStr) ?? 0;
+      }
+    } catch (_) {}
+    return 0;
+  }
+
   double calculateTotalServiceCost(List<Szerviz> services) {
     if (services.isEmpty) return 0;
     return services
@@ -36,7 +49,6 @@ class StatisticsService {
         .fold(0.0, (sum, s) => sum + s.cost);
   }
 
-  // CSAK az üzemanyagköltségek
   double calculateTotalFuelCost(List<Szerviz> services) {
     if (services.isEmpty) return 0;
     return services
@@ -44,7 +56,6 @@ class StatisticsService {
         .fold(0.0, (sum, s) => sum + s.cost);
   }
 
-  // Teljes költség (mindent bele)
   double calculateTotalCost(List<Szerviz> services) {
     if (services.isEmpty) return 0;
     return services
@@ -52,7 +63,6 @@ class StatisticsService {
         .fold(0.0, (sum, s) => sum + s.cost);
   }
 
-  // Költségmegoszlás (Százalékban)
   Map<String, double> getCostDistribution(List<Szerviz> services) {
     final total = calculateTotalCost(services);
     if (total == 0) return {'fuel': 0, 'service': 0, 'fixed': 0};
@@ -68,7 +78,6 @@ class StatisticsService {
     };
   }
 
-  // Havi statisztikák (tankolás alapú)
   MonthlyStats calculateMonthlyStats(List<Szerviz> allServices, DateTime selectedMonth) {
     allServices.sort((a, b) => a.date.compareTo(b.date));
 
@@ -82,13 +91,7 @@ class StatisticsService {
 
     for (final service in fuelingEventsInMonth) {
       monthlyCost += service.cost;
-      try {
-        final parts = service.description.split('(');
-        if (parts.length > 1) {
-          final literPart = parts[1].split(' ')[0].replaceAll(',', '.');
-          monthlyLiters += double.tryParse(literPart) ?? 0;
-        }
-      } catch (e) { /* ignore */ }
+      monthlyLiters += _extractLiters(service.description);
     }
 
     if (fuelingEventsInMonth.length >= 2) {
@@ -118,13 +121,7 @@ class StatisticsService {
           for (int j = startIndexInAll + 1; j <= endIndexInAll; j++) {
             final s = allServices[j];
             if (_isFuel(s)) {
-              try {
-                final parts = s.description.split('(');
-                if (parts.length > 1) {
-                  final literPart = parts[1].split(' ')[0].replaceAll(',', '.');
-                  litersInPeriod += double.tryParse(literPart) ?? 0;
-                }
-              } catch (e) { /* ignore */ }
+              litersInPeriod += _extractLiters(s.description);
             }
           }
 
@@ -227,27 +224,22 @@ class StatisticsService {
   double getAverageDailyKm(List<Szerviz> services) {
     if (services.isEmpty) return 0;
     
-    // Csak a valós bejegyzéseket nézzük (tankolás + szerviz), a rejtett emlékeztetőket nem
     final realServices = services
         .where((s) => !s.description.startsWith('Emlékeztető alap: '))
         .toList();
         
     if (realServices.length < 2) return 0;
     
-    // Dátum szerint sorba rendezzük (legfrissebb elöl)
     realServices.sort((a, b) => b.date.compareTo(a.date));
 
-    // JAVÍTÁS: Csak az utolsó legfeljebb 5 bejegyzés alapján számolunk átlagot,
-    // hogy a JELENLEGI használatot tükrözze az autó teljes élettartama helyett.
     final recentOnes = realServices.take(5).toList();
     
-    final last = recentOnes.first;  // Időben a legújabb
-    final first = recentOnes.last;  // A mintában a legrégebbi
+    final last = recentOnes.first;  
+    final first = recentOnes.last;  
     
     final days = last.date.difference(first.date).inDays;
     final kmDiff = last.mileage - first.mileage;
 
-    // Ha ugyanazon a napon történt minden, vagy nincs km különbség, nullát adunk vissza
     if (days <= 0 || kmDiff <= 0) return 0;
     
     return kmDiff / days;
@@ -258,16 +250,14 @@ class StatisticsService {
     if (dailyKm <= 0) return {};
 
     try {
-      // Megkeressük a legközelebbi emlékeztetőt
       final reminders = services.where((s) => s.description.startsWith('Emlékeztető alap: ')).toList();
       if (reminders.isEmpty) return {};
 
-      // Példa: Olajcsere predikció
       final lastOil = reminders.firstWhere((s) => s.description.contains('Olajcsere'));
       final currentMileage = services.map((s) => s.mileage).reduce(max);
       
       final kmSince = currentMileage - lastOil.mileage;
-      final kmLeft = 15000 - kmSince; // Alapértelmezett 15e km
+      final kmLeft = 15000 - kmSince; 
 
       if (kmLeft < 0) return {'type': 'Olajcsere', 'urgent': true};
 
